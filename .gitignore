@@ -1,0 +1,27 @@
+# =====================================================================
+# PUBLIC REPO — keep PII out
+# =====================================================================
+# Raw exports contain customer/passenger names, emails, phone numbers
+*.xls
+*.xlsx
+
+# jobs.json contains corporate Account Names — exclude
+jobs.json
+
+# Full dashboard embeds jobs.json with account names — exclude
+dashboard.html
+
+# Tool result captures, etc.
+tool-results/
+
+# =====================================================================
+# Standard ignores
+# =====================================================================
+.claude/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store

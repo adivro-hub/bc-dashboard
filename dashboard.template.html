@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Income Structure — Weekly Comparison</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a33; --panel-2:#0f1730; --line:#1f2a4d;
+    --text:#e6ecff; --muted:#9aa6cf; --accent:#7c9cff;
+    --curr:#7c9cff; --prev:#ffb86b; --good:#3ddc97; --bad:#ff6b8a;
+    --shadow:0 8px 30px rgba(0,0,0,.35);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1400px;margin:0 auto;padding:28px}
+  h1{font-size:22px;margin:0 0 4px 0;letter-spacing:.2px}
+  h2{font-size:16px;margin:24px 0 12px 0;color:var(--text);font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+  .sub{color:var(--muted);font-size:13px}
+  .legend{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:12px;color:var(--muted)}
+  .legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  .grid{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(5,1fr)}
+  .panels{grid-template-columns:1fr 1fr}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+  .kpi .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .value{font-size:24px;font-weight:700;margin-top:6px;letter-spacing:.2px}
+  .kpi .prev{font-size:12px;color:var(--muted);margin-top:4px}
+  .delta{display:inline-block;margin-top:8px;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600}
+  .delta.up{background:rgba(61,220,151,.15);color:var(--good)}
+  .delta.down{background:rgba(255,107,138,.15);color:var(--bad)}
+  .delta.flat{background:rgba(154,166,207,.15);color:var(--muted)}
+  .chart-wrap{position:relative;height:320px}
+  .chart-wrap.tall{height:380px}
+  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
+  tbody tr:hover{background:rgba(124,156,255,.05)}
+  .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+  .filter{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .filter h4{margin:0 0 6px 0;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center}
+  .filter h4 .count{color:var(--accent);font-weight:700}
+  .filter .ctrls{display:flex;gap:6px;margin-bottom:6px}
+  .filter .ctrls button, .filter input[type="search"]{
+    background:var(--panel);color:var(--text);border:1px solid var(--line);
+    border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-family:inherit;
+  }
+  .filter input[type="search"]{flex:1;cursor:text}
+  .filter .ctrls button:hover{background:var(--line)}
+  .options{max-height:160px;overflow-y:auto;padding-right:4px}
+  .options::-webkit-scrollbar{width:6px}
+  .options::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+  .opt{display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:4px;font-size:12px;cursor:pointer}
+  .opt:hover{background:rgba(124,156,255,.08)}
+  .opt input{cursor:pointer;accent-color:var(--accent)}
+  .opt .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .opt .badge{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .pivot-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+  .pivot-wrap h3{margin:0 0 8px 0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .summary-strip{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
+  .summary-strip .chip{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px}
+  .summary-strip .chip strong{color:var(--text);font-variant-numeric:tabular-nums}
+  @media (max-width:1100px){
+    .filters{grid-template-columns:repeat(2,1fr)}
+    .pivot-wrap{grid-template-columns:1fr}
+  }
+  .num{font-variant-numeric:tabular-nums}
+  .pos{color:var(--good)}
+  .neg{color:var(--bad)}
+  .muted{color:var(--muted)}
+  .row-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px}
+  .pill{display:inline-block;padding:3px 8px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);font-size:11px;color:var(--muted);margin-left:8px}
+  @media (max-width: 1100px){
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .panels{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Income Structure — Weekly Comparison</h1>
+    <div class="sub" id="periodLine"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--curr)"></span>Current week</span>
+      <span><span class="dot" style="background:var(--prev)"></span>Previous week</span>
+    </div>
+  </header>
+
+  <h2>Headline KPIs</h2>
+  <div class="grid kpis" id="kpiGrid"></div>
+
+  <h2>User registrations</h2>
+  <div class="card" id="regCard">
+    <div class="grid panels">
+      <div>
+        <div class="grid kpis" style="grid-template-columns:repeat(2,1fr)" id="regKpis"></div>
+        <div class="summary-strip" id="regStatus" style="margin-top:10px"></div>
+        <p class="sub" id="regNote" style="margin-top:10px"></p>
+      </div>
+      <div>
+        <div class="row-head"><div><strong>Daily registrations</strong></div></div>
+        <div class="chart-wrap"><canvas id="regChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Sales composition (current week share %)</h2>
+  <div class="grid panels">
+    <div class="card">
+      <div class="row-head"><div><strong>By Payment Type</strong></div></div>
+      <div class="chart-wrap"><canvas id="donutPayment"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="row-head"><div><strong>By Customer Grade</strong></div></div>
+      <div class="chart-wrap"><canvas id="donutCustomer"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="row-head"><div><strong>By Service</strong></div></div>
+      <div class="chart-wrap"><canvas id="donutService"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="row-head"><div><strong>By Fleet</strong></div></div>
+      <div class="chart-wrap"><canvas id="donutFleet"></canvas></div>
+    </div>
+  </div>
+
+  <h2>Week-over-week comparison — Sales (Total RON)</h2>
+
+  <div class="card">
+    <div class="row-head"><div><strong>By Payment Type</strong><span class="pill">Total RON</span></div></div>
+    <div class="chart-wrap tall"><canvas id="barPayment"></canvas></div>
+    <table id="tblPayment"></table>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="row-head"><div><strong>By Customer Grade</strong><span class="pill">Total RON</span></div></div>
+    <div class="chart-wrap tall"><canvas id="barCustomer"></canvas></div>
+    <table id="tblCustomer"></table>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="row-head"><div><strong>By Service</strong><span class="pill">Total RON</span></div></div>
+    <div class="chart-wrap tall"><canvas id="barService"></canvas></div>
+    <table id="tblService"></table>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="row-head"><div><strong>By Fleet</strong><span class="pill">Total RON</span></div></div>
+    <div class="chart-wrap tall"><canvas id="barFleet"></canvas></div>
+    <table id="tblFleet"></table>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="row-head"><div><strong>Driver Login Time by Fleet</strong><span class="pill">Hours</span></div></div>
+    <div class="chart-wrap tall"><canvas id="barHours"></canvas></div>
+    <table id="tblHours"></table>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="row-head">
+      <div><strong>Hours per job by Fleet</strong>
+        <span class="pill">Online hours ÷ jobs</span>
+        <span class="pill">lower = busier</span>
+      </div>
+    </div>
+    <div class="chart-wrap tall"><canvas id="barHoursPerJob"></canvas></div>
+    <table id="tblHoursPerJob"></table>
+  </div>
+
+  <h2>Hour Statistics — Fleet availability vs demand</h2>
+  <div class="grid kpis" id="hourKpis"></div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="row-head">
+      <div><strong>Average by hour of day</strong>
+        <span class="pill">Available = Online − On break</span>
+        <span class="pill">Busy = Doing job</span>
+      </div>
+    </div>
+    <div class="chart-wrap tall"><canvas id="hourAvgChart"></canvas></div>
+  </div>
+
+  <div class="grid panels" style="margin-top:14px">
+    <div class="card">
+      <div class="row-head"><div><strong>Current week timeline</strong> <span class="pill" id="hourCurPeriod"></span></div></div>
+      <div class="chart-wrap tall"><canvas id="hourCurChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="row-head"><div><strong>Previous week timeline</strong> <span class="pill" id="hourPrevPeriod"></span></div></div>
+      <div class="chart-wrap tall"><canvas id="hourPrevChart"></canvas></div>
+    </div>
+  </div>
+
+  <h2>Job Analogue — Pivot by Service</h2>
+  <div class="card">
+    <div class="filters">
+      <div class="filter" id="f-account">
+        <h4>Account Number <span class="count" data-count></span></h4>
+        <div class="ctrls">
+          <input type="search" placeholder="Search account…" data-search />
+          <button data-all>All</button>
+          <button data-none>None</button>
+        </div>
+        <div class="options" data-options></div>
+      </div>
+      <div class="filter" id="f-urgency">
+        <h4>Urgency <span class="count" data-count></span></h4>
+        <div class="ctrls">
+          <button data-all>All</button>
+          <button data-none>None</button>
+        </div>
+        <div class="options" data-options></div>
+      </div>
+      <div class="filter" id="f-status">
+        <h4>Status <span class="count" data-count></span></h4>
+        <div class="ctrls">
+          <button data-all>All</button>
+          <button data-none>None</button>
+        </div>
+        <div class="options" data-options></div>
+      </div>
+      <div class="filter" id="f-hour">
+        <h4>Hour of day <span class="count" data-count></span></h4>
+        <div class="ctrls">
+          <button data-all>All</button>
+          <button data-none>None</button>
+          <button data-business>Day (07–19)</button>
+          <button data-night>Night</button>
+        </div>
+        <div class="options" data-options></div>
+      </div>
+    </div>
+
+    <div class="summary-strip" id="pivotSummary"></div>
+
+    <div class="pivot-wrap">
+      <div>
+        <h3>Current week (<span id="pivotPeriodCur"></span>)</h3>
+        <table id="pivotCur"></table>
+      </div>
+      <div>
+        <h3>Previous week (<span id="pivotPeriodPrev"></span>)</h3>
+        <table id="pivotPrev"></table>
+      </div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top:24px">Source files: Income Structure and Job Analogue exports for the two periods shown above.</p>
+</div>
+
+<!--DATA_PLACEHOLDER-->
+<!--JOBS_PLACEHOLDER-->
+<!--HOURS_PLACEHOLDER-->
+<!--REG_PLACEHOLDER-->
+
+<script>
+(function(){
+  const D = window.__DATA__;
+  const cur = D.current, prev = D.previous;
+  const fmtMoney = v => (v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtInt   = v => Math.round(v||0).toLocaleString('en-US');
+  const fmtPct   = v => (v>=0?'+':'') + v.toFixed(1) + '%';
+
+  document.getElementById('periodLine').textContent =
+    `Current: ${cur.period_from} → ${cur.period_to}    •    Previous: ${prev.period_from} → ${prev.period_to}`;
+
+  // ---------- KPI CARDS ----------
+  const kpiDefs = [
+    {key:'total',       label:'Total sales (RON)', fmt:fmtMoney},
+    {key:'jobs',        label:'Total jobs',        fmt:fmtInt},
+    {key:'earnings',    label:'Earnings (RON)',    fmt:fmtMoney},
+    {key:'avg_per_job', label:'Avg per job (RON)', fmt:fmtMoney},
+    {key:'vat',         label:'VAT collected (RON)', fmt:fmtMoney},
+  ];
+  const grid = document.getElementById('kpiGrid');
+  kpiDefs.forEach(d=>{
+    const c = cur.kpis[d.key], p = prev.kpis[d.key];
+    const delta = p? ((c-p)/p)*100 : 0;
+    const cls = Math.abs(delta) < 0.05 ? 'flat' : (delta>=0?'up':'down');
+    const arrow = cls==='up'?'▲':cls==='down'?'▼':'■';
+    grid.insertAdjacentHTML('beforeend', `
+      <div class="card kpi">
+        <div class="label">${d.label}</div>
+        <div class="value num">${d.fmt(c)}</div>
+        <div class="prev num">prev ${d.fmt(p)}</div>
+        <span class="delta ${cls}">${arrow} ${fmtPct(delta)}</span>
+      </div>`);
+  });
+
+  // ---------- HELPERS ----------
+  const COLOURS = ['#7c9cff','#ffb86b','#3ddc97','#ff6b8a','#a78bfa','#5ee2ff','#ffd166','#f78fb3','#9aa6cf','#b4f8c8','#fbc4ab','#caffbf'];
+
+  function unionKeys(a, b, sortByCurTotal=true){
+    const set = new Set([...Object.keys(a||{}), ...Object.keys(b||{})]);
+    let keys = [...set];
+    if (sortByCurTotal){
+      keys.sort((k1,k2) => ((b[k2]?.total ?? b[k2]?.jobs ?? 0) - (b[k1]?.total ?? b[k1]?.jobs ?? 0))); // sort by current week magnitude
+    }
+    return keys;
+  }
+  function getMetric(section, key, metric){
+    return section[key] ? (section[key][metric] || 0) : 0;
+  }
+
+  // ---------- USER REGISTRATIONS ----------
+  const R = window.__REG__;
+  if (R){
+    const sCur = R.summary.current, sPrev = R.summary.previous;
+    const dTot = sCur.total - sPrev.total;
+    const pTot = sPrev.total ? (dTot / sPrev.total) * 100 : 0;
+    const cls = Math.abs(pTot) < 0.05 ? 'flat' : (pTot >= 0 ? 'up' : 'down');
+    const arrow = cls==='up'?'▲':cls==='down'?'▼':'■';
+    document.getElementById('regKpis').innerHTML = `
+      <div class="card kpi">
+        <div class="label">Current week</div>
+        <div class="value num">${fmtInt(sCur.total)}</div>
+        <div class="prev num">prev ${fmtInt(sPrev.total)}</div>
+        <span class="delta ${cls}">${arrow} ${(pTot>=0?'+':'')+pTot.toFixed(1)}% (${dTot>=0?'+':''}${fmtInt(dTot)})</span>
+      </div>
+      <div class="card kpi">
+        <div class="label">Combined (both weeks)</div>
+        <div class="value num">${fmtInt(sCur.total + sPrev.total)}</div>
+        <div class="prev num muted">across both files</div>
+      </div>`;
+
+    function statusChips(label, m){
+      const parts = Object.entries(m).map(([k,v])=>`<strong>${k}</strong> ${fmtInt(v)}`).join(' · ');
+      return `<span class="chip">${label}: ${parts}</span>`;
+    }
+    document.getElementById('regStatus').innerHTML =
+      statusChips('Current status', sCur.by_status) + statusChips('Previous status', sPrev.by_status);
+
+    // Daily chart — align by ordinal day-of-week so the two weeks are comparable
+    const curDates  = Object.keys(sCur.daily).sort();
+    const prevDates = Object.keys(sPrev.daily).sort();
+    const maxLen = Math.max(curDates.length, prevDates.length);
+    const labels = Array.from({length:maxLen}, (_,i)=>`Day ${i+1}`);
+
+    new Chart(document.getElementById('regChart'), {
+      type:'bar',
+      data:{
+        labels,
+        datasets:[
+          {label:'Current',  data:curDates.map(d=>sCur.daily[d]),   backgroundColor:'#7c9cff', borderRadius:4},
+          {label:'Previous', data:prevDates.map(d=>sPrev.daily[d]), backgroundColor:'#ffb86b', borderRadius:4},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{labels:{color:'#e6ecff'}},
+          tooltip:{callbacks:{
+            title:(items)=>{
+              const i = items[0].dataIndex;
+              const cd = curDates[i] || '—';
+              const pd = prevDates[i] || '—';
+              return `${items[0].label} (cur ${cd} / prev ${pd})`;
+            },
+            label:(ctx)=>`${ctx.dataset.label}: ${fmtInt(ctx.raw)}`
+          }}
+        },
+        scales:{
+          x:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}},
+          y:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}, beginAtZero:true}
+        }
+      }
+    });
+
+    // Source/coverage note
+    const f = R.files.map(x=>`${x.file}: ${x.rows} rows, ${x.min.slice(0,10)} → ${x.max.slice(0,10)}`).join('  •  ');
+    document.getElementById('regNote').textContent =
+      `Source files — ${f}. Both exports cover 6 of the 7 days of their week (last day missing); totals reflect that.`;
+  }
+
+  // ---------- DONUTS (current week share) ----------
+  function makeDonut(canvasId, section, metric='total'){
+    const entries = Object.entries(section)
+      .map(([k,v])=>[k, v[metric]||0])
+      .filter(([_,v])=>v>0)
+      .sort((a,b)=>b[1]-a[1]);
+    const labels = entries.map(e=>e[0]);
+    const values = entries.map(e=>e[1]);
+    new Chart(document.getElementById(canvasId), {
+      type:'doughnut',
+      data:{labels, datasets:[{data:values, backgroundColor:labels.map((_,i)=>COLOURS[i%COLOURS.length]), borderColor:'#0b1020', borderWidth:2}]},
+      options:{
+        plugins:{
+          legend:{position:'right', labels:{color:'#e6ecff', boxWidth:10, padding:8, font:{size:11}}},
+          tooltip:{callbacks:{label:(ctx)=>{
+            const tot = values.reduce((s,v)=>s+v,0);
+            const pct = tot? (ctx.raw/tot*100).toFixed(1):0;
+            return `${ctx.label}: ${fmtMoney(ctx.raw)} (${pct}%)`;
+          }}}
+        },
+        cutout:'58%',
+        responsive:true, maintainAspectRatio:false
+      }
+    });
+  }
+
+  // ---------- GROUPED BARS + TABLE ----------
+  function makeBarsAndTable(canvasId, tableId, curSection, prevSection, metric='total', metricLabel='Total RON', tableFmt=fmtMoney, withJobs=true){
+    const keys = unionKeys(curSection, prevSection);
+    const curVals  = keys.map(k=>getMetric(curSection, k, metric));
+    const prevVals = keys.map(k=>getMetric(prevSection, k, metric));
+    const curJobs  = keys.map(k=>getMetric(curSection, k, 'jobs'));
+    const prevJobs = keys.map(k=>getMetric(prevSection, k, 'jobs'));
+    const showJobs = withJobs && metric !== 'jobs';
+
+    new Chart(document.getElementById(canvasId), {
+      type:'bar',
+      data:{
+        labels:keys,
+        datasets:[
+          {label:'Current', data:curVals,  backgroundColor:'#7c9cff', borderRadius:4},
+          {label:'Previous',data:prevVals, backgroundColor:'#ffb86b', borderRadius:4},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{labels:{color:'#e6ecff'}},
+          tooltip:{callbacks:{
+            label:(ctx)=>`${ctx.dataset.label}: ${tableFmt(ctx.raw)}`,
+            afterLabel:(ctx)=>{
+              if (!showJobs) return '';
+              const j = ctx.datasetIndex===0 ? curJobs[ctx.dataIndex] : prevJobs[ctx.dataIndex];
+              return `Jobs: ${fmtInt(j)}`;
+            }
+          }}
+        },
+        scales:{
+          x:{ticks:{color:'#9aa6cf', autoSkip:false, maxRotation:55, minRotation:35}, grid:{color:'rgba(154,166,207,.08)'}},
+          y:{ticks:{color:'#9aa6cf', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}, grid:{color:'rgba(154,166,207,.08)'}}
+        }
+      }
+    });
+
+    // Table — when showJobs is true, include Cur/Prev jobs + jobs Δ %
+    const table = document.getElementById(tableId);
+    const headExtra = showJobs ? `<th>Cur jobs</th><th>Prev jobs</th><th>Δ jobs %</th>` : ``;
+    let html = `<thead><tr>
+      <th>Item</th>
+      ${headExtra}
+      <th>Current ${metricLabel}</th>
+      <th>Previous ${metricLabel}</th>
+      <th>Δ abs</th>
+      <th>Δ %</th>
+      <th>Share now</th>
+    </tr></thead><tbody>`;
+    const totCur = curVals.reduce((s,v)=>s+v,0);
+    const totCurJobs  = curJobs.reduce((s,v)=>s+v,0);
+    const totPrevJobs = prevJobs.reduce((s,v)=>s+v,0);
+    keys.forEach((k,i)=>{
+      const c = curVals[i], p = prevVals[i];
+      const dAbs = c - p;
+      const dPct = p? (dAbs/p)*100 : (c?100:0);
+      const share = totCur? (c/totCur)*100 : 0;
+      const dCls = Math.abs(dAbs) < 0.005 ? 'muted' : (dAbs>=0?'pos':'neg');
+
+      let jobsCells = '';
+      if (showJobs){
+        const cj = curJobs[i], pj = prevJobs[i];
+        const dj  = cj - pj;
+        const djPct = pj ? (dj/pj)*100 : (cj?100:0);
+        const djCls = Math.abs(dj) < 0.5 ? 'muted' : (dj>=0?'pos':'neg');
+        jobsCells = `
+          <td class="num">${fmtInt(cj)}</td>
+          <td class="num muted">${fmtInt(pj)}</td>
+          <td class="num ${djCls}">${pj? (dj>=0?'+':'')+djPct.toFixed(1)+'%' : (cj?'new':'—')}</td>`;
+      }
+
+      html += `<tr>
+        <td>${k}</td>
+        ${jobsCells}
+        <td class="num">${tableFmt(c)}</td>
+        <td class="num muted">${tableFmt(p)}</td>
+        <td class="num ${dCls}">${dAbs>=0?'+':''}${tableFmt(dAbs)}</td>
+        <td class="num ${dCls}">${p? (dAbs>=0?'+':'')+dPct.toFixed(1)+'%' : (c?'new':'—')}</td>
+        <td class="num">${share.toFixed(1)}%</td>
+      </tr>`;
+    });
+    // Totals row
+    const totPrev = prevVals.reduce((s,v)=>s+v,0);
+    const dAbs = totCur - totPrev;
+    const dPct = totPrev? (dAbs/totPrev)*100 : 0;
+    let totJobsCells = '';
+    if (showJobs){
+      const dj = totCurJobs - totPrevJobs;
+      const djPct = totPrevJobs ? (dj/totPrevJobs)*100 : 0;
+      const djCls = dj>=0?'pos':'neg';
+      totJobsCells = `
+        <td class="num">${fmtInt(totCurJobs)}</td>
+        <td class="num">${fmtInt(totPrevJobs)}</td>
+        <td class="num ${djCls}">${(dj>=0?'+':'')+djPct.toFixed(1)+'%'}</td>`;
+    }
+    html += `<tr style="font-weight:700">
+      <td>Total</td>
+      ${totJobsCells}
+      <td class="num">${tableFmt(totCur)}</td>
+      <td class="num">${tableFmt(totPrev)}</td>
+      <td class="num ${dAbs>=0?'pos':'neg'}">${dAbs>=0?'+':''}${tableFmt(dAbs)}</td>
+      <td class="num ${dAbs>=0?'pos':'neg'}">${(dAbs>=0?'+':'')}${dPct.toFixed(1)}%</td>
+      <td class="num">100%</td>
+    </tr></tbody>`;
+    table.innerHTML = html;
+  }
+
+  // ---------- DRAW EVERYTHING ----------
+  makeDonut('donutPayment',  cur.sections.payment_type);
+  makeDonut('donutCustomer', cur.sections.customer_grade);
+  makeDonut('donutService',  cur.sections.service);
+  makeDonut('donutFleet',    cur.sections.fleet);
+
+  makeBarsAndTable('barPayment',  'tblPayment',  cur.sections.payment_type,   prev.sections.payment_type);
+  makeBarsAndTable('barCustomer', 'tblCustomer', cur.sections.customer_grade, prev.sections.customer_grade);
+  makeBarsAndTable('barService',  'tblService',  cur.sections.service,        prev.sections.service);
+  makeBarsAndTable('barFleet',    'tblFleet',    cur.sections.fleet,          prev.sections.fleet);
+  makeBarsAndTable('barHours',    'tblHours',    cur.sections.driver_hours,   prev.sections.driver_hours, 'jobs', 'hours', fmtInt);
+
+  // ---------- HOURS PER JOB BY FLEET ----------
+  // Online hours come from `driver_hours` section (the "jobs" field there is actually hours)
+  // Job counts come from `fleet` section.
+  function hoursPerJobByFleet(week){
+    const hours = week.sections.driver_hours;
+    const fleet = week.sections.fleet;
+    const keys = new Set([...Object.keys(hours||{}), ...Object.keys(fleet||{})]);
+    const rows = [];
+    keys.forEach(k=>{
+      const h = hours[k]?.jobs ?? 0;   // online hours
+      const j = fleet[k]?.jobs ?? 0;   // jobs done
+      rows.push({fleet:k, hours:h, jobs:j, hpj: j>0 ? h/j : null});
+    });
+    return rows;
+  }
+  const hpjCur  = hoursPerJobByFleet(cur);
+  const hpjPrev = hoursPerJobByFleet(prev);
+
+  // Sort fleets by current week jobs desc; keep only fleets with hours OR jobs in either week
+  const hpjAll = new Map();
+  [...hpjCur, ...hpjPrev].forEach(r=>{
+    if (!hpjAll.has(r.fleet)) hpjAll.set(r.fleet, true);
+  });
+  const fleetOrder = [...hpjAll.keys()].sort((a,b)=>{
+    const ja = (hpjCur.find(r=>r.fleet===a)?.jobs || 0);
+    const jb = (hpjCur.find(r=>r.fleet===b)?.jobs || 0);
+    return jb - ja;
+  });
+
+  const curMap  = Object.fromEntries(hpjCur.map(r=>[r.fleet,r]));
+  const prevMap = Object.fromEntries(hpjPrev.map(r=>[r.fleet,r]));
+
+  const curHpjVals  = fleetOrder.map(f => curMap[f]?.hpj ?? null);
+  const prevHpjVals = fleetOrder.map(f => prevMap[f]?.hpj ?? null);
+
+  new Chart(document.getElementById('barHoursPerJob'), {
+    type:'bar',
+    data:{
+      labels: fleetOrder,
+      datasets:[
+        {label:'Current', data:curHpjVals,  backgroundColor:'#7c9cff', borderRadius:4},
+        {label:'Previous',data:prevHpjVals, backgroundColor:'#ffb86b', borderRadius:4},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{color:'#e6ecff'}},
+        tooltip:{callbacks:{label:(ctx)=>{
+          const v = ctx.raw;
+          return `${ctx.dataset.label}: ${v==null?'n/a':v.toFixed(2)+' h/job'}`;
+        }}}
+      },
+      scales:{
+        x:{ticks:{color:'#9aa6cf', autoSkip:false, maxRotation:55, minRotation:35}, grid:{color:'rgba(154,166,207,.08)'}},
+        y:{ticks:{color:'#9aa6cf', callback:v=>v.toFixed(1)}, grid:{color:'rgba(154,166,207,.08)'}, title:{display:true,text:'Hours per job',color:'#9aa6cf'}}
+      }
+    }
+  });
+
+  // Companion table — hours, jobs, and the ratio side-by-side for both weeks + Δ%
+  let hpjHtml = `<thead><tr>
+    <th>Fleet</th>
+    <th>Cur hours</th>
+    <th>Prev hours</th>
+    <th>Cur jobs</th>
+    <th>Prev jobs</th>
+    <th>Cur h/job</th>
+    <th>Prev h/job</th>
+    <th>Δ %</th>
+  </tr></thead><tbody>`;
+  let curHTot=0, curJTot=0, prevHTot=0, prevJTot=0;
+  fleetOrder.forEach(f=>{
+    const c = curMap[f]  || {hours:0, jobs:0, hpj:null};
+    const p = prevMap[f] || {hours:0, jobs:0, hpj:null};
+    curHTot += c.hours; curJTot += c.jobs;
+    prevHTot += p.hours; prevJTot += p.jobs;
+    const d    = (c.hpj!=null && p.hpj!=null) ? (c.hpj - p.hpj) : null;
+    const dPct = (d!=null && p.hpj>0) ? (d / p.hpj) * 100 : null;
+    const dCls = d==null ? 'muted' : (Math.abs(d)<0.005?'muted' : (d<=0?'pos':'neg')); // lower h/job = better
+    hpjHtml += `<tr>
+      <td>${f}</td>
+      <td class="num">${fmtInt(c.hours)}</td>
+      <td class="num muted">${fmtInt(p.hours)}</td>
+      <td class="num">${fmtInt(c.jobs)}</td>
+      <td class="num muted">${fmtInt(p.jobs)}</td>
+      <td class="num">${c.hpj==null?'<span class="muted">—</span>':c.hpj.toFixed(2)}</td>
+      <td class="num muted">${p.hpj==null?'—':p.hpj.toFixed(2)}</td>
+      <td class="num ${dCls}">${dPct==null?'—':(dPct>=0?'+':'')+dPct.toFixed(1)+'%'}</td>
+    </tr>`;
+  });
+  const curOverall  = curJTot>0  ? curHTot/curJTot   : null;
+  const prevOverall = prevJTot>0 ? prevHTot/prevJTot : null;
+  const dOverall    = (curOverall!=null && prevOverall!=null) ? curOverall - prevOverall : null;
+  const dOverallPct = (dOverall!=null && prevOverall>0) ? (dOverall / prevOverall) * 100 : null;
+  const dOverallCls = dOverall==null ? 'muted' : (dOverall<=0?'pos':'neg');
+  hpjHtml += `<tr style="font-weight:700">
+    <td>Overall</td>
+    <td class="num">${fmtInt(curHTot)}</td>
+    <td class="num">${fmtInt(prevHTot)}</td>
+    <td class="num">${fmtInt(curJTot)}</td>
+    <td class="num">${fmtInt(prevJTot)}</td>
+    <td class="num">${curOverall==null?'—':curOverall.toFixed(2)}</td>
+    <td class="num">${prevOverall==null?'—':prevOverall.toFixed(2)}</td>
+    <td class="num ${dOverallCls}">${dOverallPct==null?'—':(dOverallPct>=0?'+':'')+dOverallPct.toFixed(1)+'%'}</td>
+  </tr></tbody>`;
+  document.getElementById('tblHoursPerJob').innerHTML = hpjHtml;
+
+  // ============================================================
+  // HOUR STATISTICS
+  // ============================================================
+  const H = window.__HOURS__;
+  if (H){
+    const hCur = H.current, hPrev = H.previous;
+    document.getElementById('hourCurPeriod').textContent  = hCur.period;
+    document.getElementById('hourPrevPeriod').textContent = hPrev.period;
+
+    const hKpiDefs = [
+      {label:'Peak available vehicles', get:d=>d.derived.peak_available, fmt:fmtInt},
+      {label:'Peak vehicles on job',    get:d=>d.derived.peak_busy,      fmt:fmtInt},
+      {label:'Avg utilisation',         get:d=>d.derived.util_avg*100,   fmt:v=>v.toFixed(1)+'%'},
+      {label:'Σ Online vehicle-hours',  get:d=>d.derived.online_total,   fmt:fmtInt},
+      {label:'Σ On-break vehicle-hours',get:d=>d.derived.on_break_total, fmt:fmtInt},
+    ];
+    const hGrid = document.getElementById('hourKpis');
+    hKpiDefs.forEach(def=>{
+      const c = def.get(hCur), p = def.get(hPrev);
+      const delta = p? ((c-p)/p)*100 : 0;
+      const cls = Math.abs(delta) < 0.05 ? 'flat' : (delta>=0?'up':'down');
+      const arrow = cls==='up'?'▲':cls==='down'?'▼':'■';
+      hGrid.insertAdjacentHTML('beforeend', `
+        <div class="card kpi">
+          <div class="label">${def.label}</div>
+          <div class="value num">${def.fmt(c)}</div>
+          <div class="prev num">prev ${def.fmt(p)}</div>
+          <span class="delta ${cls}">${arrow} ${(delta>=0?'+':'')+delta.toFixed(1)}%</span>
+        </div>`);
+    });
+
+    // Average by hour of day — emphasise Available + Busy
+    const hourLabels = Array.from({length:24}, (_,h)=>String(h).padStart(2,'0')+':00');
+    const availCur  = hCur.by_hour_of_day.online.map((o,i)=>o - hCur.by_hour_of_day.on_break[i]);
+    const availPrev = hPrev.by_hour_of_day.online.map((o,i)=>o - hPrev.by_hour_of_day.on_break[i]);
+    const busyCur   = hCur.by_hour_of_day.doing_job;
+    const busyPrev  = hPrev.by_hour_of_day.doing_job;
+
+    new Chart(document.getElementById('hourAvgChart'), {
+      type:'line',
+      data:{
+        labels: hourLabels,
+        datasets:[
+          {label:'Available — current',  data:availCur,  borderColor:'#7c9cff', backgroundColor:'rgba(124,156,255,.18)', fill:true,  tension:.3, borderWidth:2.5, pointRadius:2},
+          {label:'Busy — current',       data:busyCur,   borderColor:'#3ddc97', backgroundColor:'rgba(61,220,151,.18)',  fill:true,  tension:.3, borderWidth:2.5, pointRadius:2},
+          {label:'Available — previous', data:availPrev, borderColor:'#ffb86b', borderDash:[6,4], fill:false, tension:.3, borderWidth:2, pointRadius:0},
+          {label:'Busy — previous',      data:busyPrev,  borderColor:'#ff6b8a', borderDash:[6,4], fill:false, tension:.3, borderWidth:2, pointRadius:0},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{labels:{color:'#e6ecff'}},
+          tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${ctx.raw.toFixed(1)}`}}
+        },
+        scales:{
+          x:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}},
+          y:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}, title:{display:true,text:'Vehicles (avg)',color:'#9aa6cf'}}
+        }
+      }
+    });
+
+    // Per-week 168-hour timeline: stacked area Busy + Idle (= Available - Busy) with On break and Online line
+    function timelineChart(canvasId, week){
+      const ts = week.timestamps.map(s => {
+        const d = new Date(s);
+        return d.toLocaleString('en-GB',{weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false});
+      });
+      const online   = week.hourly.online;
+      const onBreak  = week.hourly.on_break;
+      const busy     = week.hourly.doing_job;
+      const available= online.map((o,i)=>Math.max(0, o - onBreak[i]));
+      const idle     = available.map((a,i)=>Math.max(0, a - busy[i]));
+
+      new Chart(document.getElementById(canvasId), {
+        type:'line',
+        data:{
+          labels: ts,
+          datasets:[
+            {label:'Busy (doing job)', data:busy, borderColor:'#3ddc97', backgroundColor:'rgba(61,220,151,.55)', fill:'origin', tension:.25, borderWidth:1.5, pointRadius:0, stack:'a'},
+            {label:'Idle available',    data:idle, borderColor:'#7c9cff', backgroundColor:'rgba(124,156,255,.35)', fill:'-1',     tension:.25, borderWidth:1,   pointRadius:0, stack:'a'},
+            {label:'On break',          data:onBreak, borderColor:'#ffb86b', backgroundColor:'rgba(255,184,107,.20)', fill:'-1', tension:.25, borderWidth:1,  pointRadius:0, stack:'a'},
+            {label:'Online (total)',    data:online, borderColor:'#e6ecff', backgroundColor:'transparent', fill:false, tension:.25, borderWidth:1.5, pointRadius:0, borderDash:[3,3]},
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          interaction:{mode:'index', intersect:false},
+          plugins:{
+            legend:{labels:{color:'#e6ecff', boxWidth:12, font:{size:11}}},
+            tooltip:{callbacks:{title:(items)=>items[0].label, label:(ctx)=>`${ctx.dataset.label}: ${Math.round(ctx.raw)}`}}
+          },
+          scales:{
+            x:{ticks:{color:'#9aa6cf', autoSkip:true, maxTicksLimit:14}, grid:{color:'rgba(154,166,207,.06)'}},
+            y:{stacked:false, ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}, title:{display:true,text:'Vehicles',color:'#9aa6cf'}}
+          }
+        }
+      });
+    }
+    timelineChart('hourCurChart',  hCur);
+    timelineChart('hourPrevChart', hPrev);
+  }
+
+  // ============================================================
+  // PIVOT (Job Analogue)
+  // ============================================================
+  const J = window.__JOBS__;
+  if (!J) return;
+
+  document.getElementById('pivotPeriodCur').textContent  = `${cur.period_from} → ${cur.period_to}`;
+  document.getElementById('pivotPeriodPrev').textContent = `${prev.period_from} → ${prev.period_to}`;
+
+  const allRows = [...J.current.map(r=>({...r,_w:'current'})), ...J.previous.map(r=>({...r,_w:'previous'}))];
+
+  // Build option lists from the union of both weeks
+  function distinct(field, sorter){
+    const set = new Set(allRows.map(r=>r[field]));
+    let arr = [...set].filter(v => v !== '' && v !== null && v !== undefined);
+    sorter ? arr.sort(sorter) : arr.sort();
+    return arr;
+  }
+
+  // Account: include name for context but key on number
+  const accountMap = {};
+  allRows.forEach(r=>{
+    if (!r.account_no) return;
+    if (!accountMap[r.account_no]) accountMap[r.account_no] = r.account_name || '';
+    else if (!accountMap[r.account_no] && r.account_name) accountMap[r.account_no] = r.account_name;
+  });
+  const accountOpts = Object.keys(accountMap).sort((a,b)=>(accountMap[a]||a).localeCompare(accountMap[b]||b));
+
+  const urgencyOpts = distinct('urgency');
+  const statusOpts  = distinct('status');
+  const hourOpts    = [...new Set(allRows.map(r=>r.hour))]
+                        .filter(h=>h!==null && h!==undefined)
+                        .sort((a,b)=>a-b);
+
+  // Selected sets — start with EVERYTHING selected
+  const sel = {
+    account: new Set(accountOpts),
+    urgency: new Set(urgencyOpts),
+    status:  new Set(statusOpts),
+    hour:    new Set(hourOpts),
+  };
+
+  function buildFilter(elId, key, opts, labelFn){
+    const root = document.getElementById(elId);
+    const optBox = root.querySelector('[data-options]');
+    const search = root.querySelector('[data-search]');
+    const countEl = root.querySelector('[data-count]');
+
+    function render(filterText=''){
+      const t = filterText.trim().toLowerCase();
+      optBox.innerHTML = '';
+      const visible = opts.filter(v => !t || labelFn(v).toLowerCase().includes(t));
+      visible.forEach(v=>{
+        const id = `${key}-${String(v).replace(/[^\w]/g,'_')}`;
+        const div = document.createElement('label');
+        div.className = 'opt';
+        const checked = sel[key].has(v) ? 'checked' : '';
+        div.innerHTML = `<input type="checkbox" id="${id}" ${checked} /> <span class="lbl">${labelFn(v)}</span>`;
+        div.querySelector('input').addEventListener('change', e=>{
+          if (e.target.checked) sel[key].add(v); else sel[key].delete(v);
+          updateCount();
+          recompute();
+        });
+        optBox.appendChild(div);
+      });
+      updateCount();
+    }
+    function updateCount(){ countEl.textContent = `${sel[key].size}/${opts.length}`; }
+
+    root.querySelector('[data-all]').addEventListener('click', ()=>{
+      sel[key] = new Set(opts); render(search ? search.value : ''); recompute();
+    });
+    root.querySelector('[data-none]').addEventListener('click', ()=>{
+      sel[key].clear(); render(search ? search.value : ''); recompute();
+    });
+    if (search){
+      search.addEventListener('input', e => render(e.target.value));
+    }
+    if (key === 'hour'){
+      root.querySelector('[data-business]').addEventListener('click', ()=>{
+        sel.hour = new Set(opts.filter(h=>h>=7 && h<=19)); render(); recompute();
+      });
+      root.querySelector('[data-night]').addEventListener('click', ()=>{
+        sel.hour = new Set(opts.filter(h=>h<7 || h>19)); render(); recompute();
+      });
+    }
+    render();
+  }
+
+  buildFilter('f-account', 'account', accountOpts, v => `${v}${accountMap[v]?' — '+accountMap[v]:''}`);
+  buildFilter('f-urgency', 'urgency', urgencyOpts, v => v);
+  buildFilter('f-status',  'status',  statusOpts,  v => v);
+  buildFilter('f-hour',    'hour',    hourOpts,    v => String(v).padStart(2,'0')+':00');
+
+  function aggregate(rows){
+    const bySvc = {};
+    let n=0, total=0, drv=0;
+    for (const r of rows){
+      if (!sel.account.has(r.account_no)) continue;
+      if (!sel.urgency.has(r.urgency)) continue;
+      if (!sel.status.has(r.status)) continue;
+      if (!sel.hour.has(r.hour)) continue;
+      const svc = r.service || '(blank)';
+      if (!bySvc[svc]) bySvc[svc] = {jobs:0, total:0, driver:0};
+      bySvc[svc].jobs += 1;
+      bySvc[svc].total += r.total||0;
+      bySvc[svc].driver += r.driver_total||0;
+      n += 1; total += r.total||0; drv += r.driver_total||0;
+    }
+    return {bySvc, totals:{jobs:n, total, driver:drv}};
+  }
+
+  function renderPivot(elId, agg){
+    const services = Object.keys(agg.bySvc).sort((a,b)=>agg.bySvc[b].jobs - agg.bySvc[a].jobs);
+    let html = `<thead><tr>
+      <th>Service</th>
+      <th>Jobs</th>
+      <th>Σ Total Price</th>
+      <th>Σ Driver Total</th>
+      <th>Avg / job</th>
+    </tr></thead><tbody>`;
+    services.forEach(s=>{
+      const v = agg.bySvc[s];
+      html += `<tr>
+        <td>${s}</td>
+        <td class="num">${fmtInt(v.jobs)}</td>
+        <td class="num">${fmtMoney(v.total)}</td>
+        <td class="num">${fmtMoney(v.driver)}</td>
+        <td class="num muted">${fmtMoney(v.jobs?v.total/v.jobs:0)}</td>
+      </tr>`;
+    });
+    const t = agg.totals;
+    html += `<tr style="font-weight:700">
+      <td>Total</td>
+      <td class="num">${fmtInt(t.jobs)}</td>
+      <td class="num">${fmtMoney(t.total)}</td>
+      <td class="num">${fmtMoney(t.driver)}</td>
+      <td class="num">${fmtMoney(t.jobs?t.total/t.jobs:0)}</td>
+    </tr></tbody>`;
+    document.getElementById(elId).innerHTML = html;
+    return t;
+  }
+
+  function recompute(){
+    const aCur  = aggregate(J.current);
+    const aPrev = aggregate(J.previous);
+    const tCur  = renderPivot('pivotCur',  aCur);
+    const tPrev = renderPivot('pivotPrev', aPrev);
+
+    const dJ = tCur.jobs   - tPrev.jobs;
+    const dT = tCur.total  - tPrev.total;
+    const dD = tCur.driver - tPrev.driver;
+    const pct = (a,b)=> b? ((a-b)/b)*100 : 0;
+
+    function chip(label, c, p, fmt){
+      const d = c-p;
+      const cls = Math.abs(d) < 0.005 ? 'muted' : (d>=0?'pos':'neg');
+      const sign = d>=0?'+':'';
+      return `<span class="chip">${label}: <strong>${fmt(c)}</strong> vs <strong>${fmt(p)}</strong> <span class="${cls}">${sign}${fmt(d)} (${sign}${pct(c,p).toFixed(1)}%)</span></span>`;
+    }
+    document.getElementById('pivotSummary').innerHTML =
+      chip('Jobs', tCur.jobs, tPrev.jobs, fmtInt) +
+      chip('Σ Total', tCur.total, tPrev.total, fmtMoney) +
+      chip('Σ Driver Total', tCur.driver, tPrev.driver, fmtMoney);
+  }
+
+  recompute();
+})();
+</script>
+</body>
+</html>
