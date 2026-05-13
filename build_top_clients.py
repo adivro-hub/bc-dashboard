@@ -30,6 +30,9 @@ FILES = {
     "previous": ROOT / "Job Analogue 26.04.26 - 02.05.26.xls",
 }
 PUBLIC_ACCOUNT = 110000
+# Internal / non-client accounts to exclude from the corporate leaderboard
+# (these are not third-party clients).
+EXCLUDED_CORP_ACCOUNTS = {120297, 901100}   # 120297 = M I-DRIVE, 901100 = BCS Office
 TOP_N = 25
 NEEDED = ["Account Number", "Account Name", "Job Number",
           "Passenger Telephone", "Total Price", "Driver Total Price"]
@@ -136,10 +139,16 @@ retail_ctx = {
 }
 
 # ------------------------------------------------------------------------
-# CORPORATE — everything except Public Account, group by Account Number
+# CORPORATE — everything except Public Account and internal exclusions,
+# group by Account Number
 # ------------------------------------------------------------------------
-cur_corp  = cur_df [(cur_df ["_acc_n"].notna()) & (cur_df ["_acc_n"] != PUBLIC_ACCOUNT)]
-prev_corp = prev_df[(prev_df["_acc_n"].notna()) & (prev_df["_acc_n"] != PUBLIC_ACCOUNT)]
+def is_corp(df):
+    return (df["_acc_n"].notna()
+            & (df["_acc_n"] != PUBLIC_ACCOUNT)
+            & (~df["_acc_n"].isin(EXCLUDED_CORP_ACCOUNTS)))
+
+cur_corp  = cur_df [is_corp(cur_df)]
+prev_corp = prev_df[is_corp(prev_df)]
 
 # Build a name map: account number -> most-common Account Name across both weeks
 name_map = {}
