@@ -22,7 +22,7 @@
   .legend{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:12px;color:var(--muted)}
   .legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
   .grid{display:grid;gap:16px}
-  .kpis{grid-template-columns:repeat(5,1fr)}
+  .kpis{grid-template-columns:repeat(auto-fit, minmax(190px, 1fr))}
   .panels{grid-template-columns:1fr 1fr}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
   .kpi .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
@@ -321,19 +321,28 @@
     {key:'vat',         label:'VAT collected (RON)', fmt:fmtMoney},
   ];
   const grid = document.getElementById('kpiGrid');
-  kpiDefs.forEach(d=>{
-    const c = cur.kpis[d.key], p = prev.kpis[d.key];
+  function addKpi(label, c, p, fmt){
     const delta = p? ((c-p)/p)*100 : 0;
     const cls = Math.abs(delta) < 0.05 ? 'flat' : (delta>=0?'up':'down');
     const arrow = cls==='up'?'▲':cls==='down'?'▼':'■';
     grid.insertAdjacentHTML('beforeend', `
       <div class="card kpi">
-        <div class="label">${d.label}</div>
-        <div class="value num">${d.fmt(c)}</div>
-        <div class="prev num">prev ${d.fmt(p)}</div>
+        <div class="label">${label}</div>
+        <div class="value num">${fmt(c)}</div>
+        <div class="prev num">prev ${fmt(p)}</div>
         <span class="delta ${cls}">${arrow} ${fmtPct(delta)}</span>
       </div>`);
+  }
+  kpiDefs.forEach(d=>{
+    addKpi(d.label, cur.kpis[d.key], prev.kpis[d.key], d.fmt);
   });
+  // Unique retail clients in the period (users with ≥1 job).
+  // Pulled from window.__TOPCLIENTS__ which is loaded later in the body, so we
+  // check defensively and append after the income KPIs.
+  if (window.__TOPCLIENTS__ && window.__TOPCLIENTS__.retail){
+    const rc = window.__TOPCLIENTS__.retail.context;
+    addKpi('Unique retail clients', rc.cur_clients, rc.prev_clients, fmtInt);
+  }
 
   // ---------- HELPERS ----------
   const COLOURS = ['#7c9cff','#ffb86b','#3ddc97','#ff6b8a','#a78bfa','#5ee2ff','#ffd166','#f78fb3','#9aa6cf','#b4f8c8','#fbc4ab','#caffbf'];
