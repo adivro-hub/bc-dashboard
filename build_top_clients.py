@@ -32,7 +32,11 @@ FILES = {
 PUBLIC_ACCOUNT = 110000
 # Internal / non-client accounts to exclude from the corporate leaderboard
 # (these are not third-party clients).
-EXCLUDED_CORP_ACCOUNTS = {120297, 901100}   # 120297 = M I-DRIVE, 901100 = BCS Office
+EXCLUDED_CORP_ACCOUNTS = {
+    120297,   # M I-DRIVE       — internal service
+    901100,   # BCS Office      — internal
+    110003,   # COMPLIMENTARY   — free rides bucket, not a paying client
+}
 TOP_N = 25
 NEEDED = ["Account Number", "Account Name", "Job Number",
           "Passenger Telephone", "Total Price", "Driver Total Price"]
