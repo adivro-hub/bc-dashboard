@@ -19,17 +19,20 @@ jobs   = json.loads((ROOT / "jobs.json").read_text(encoding="utf-8"))
 hours  = json.loads((ROOT / "hours.json").read_text(encoding="utf-8"))
 reg    = json.loads((ROOT / "registrations.json").read_text(encoding="utf-8"))
 otp    = json.loads((ROOT / "otp.json").read_text(encoding="utf-8"))
+top    = json.loads((ROOT / "top_clients.json").read_text(encoding="utf-8"))
 template = (ROOT / "dashboard.template.html").read_text(encoding="utf-8")
 
 if PUBLIC_MODE:
     # Anonymisation level (a):
-    #   - strip the customer-facing Account Name from every job row
-    #   - keep the account number so the pivot still works
-    #   - everything else (services, fleets, payment types, customer grades,
-    #     all aggregates) is non-personal and stays as-is
+    #   - strip Account Name from every job row in jobs.json (pivot)
+    #   - strip Account Name from each corporate top-25 row
+    #   - keep numeric Account Numbers so tables still make sense
+    #   - retail top-25 is already anonymised as "Client #N" at build time
     for week_key in ("current", "previous"):
         for row in jobs.get(week_key, []):
             row["account_name"] = ""
+    for row in top.get("corporate", {}).get("top", []):
+        row["account_name"] = ""
     # Public build is named index.html so GitHub Pages serves it at the repo root
     out_name = "index.html"
 else:
@@ -40,12 +43,14 @@ jobs_inline   = f"<script>window.__JOBS__ = {json.dumps(jobs, ensure_ascii=False
 hours_inline  = f"<script>window.__HOURS__ = {json.dumps(hours, ensure_ascii=False)};</script>"
 reg_inline    = f"<script>window.__REG__ = {json.dumps(reg, ensure_ascii=False)};</script>"
 otp_inline    = f"<script>window.__OTP__ = {json.dumps(otp, ensure_ascii=False)};</script>"
+top_inline    = f"<script>window.__TOPCLIENTS__ = {json.dumps(top, ensure_ascii=False)};</script>"
 
 out = template.replace("<!--DATA_PLACEHOLDER-->", income_inline)
 out = out.replace("<!--JOBS_PLACEHOLDER-->", jobs_inline)
 out = out.replace("<!--HOURS_PLACEHOLDER-->", hours_inline)
 out = out.replace("<!--REG_PLACEHOLDER-->", reg_inline)
 out = out.replace("<!--OTP_PLACEHOLDER-->", otp_inline)
+out = out.replace("<!--TOPCLIENTS_PLACEHOLDER-->", top_inline)
 
 if PUBLIC_MODE:
     # Add a small banner so it's obvious which build is being viewed

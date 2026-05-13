@@ -195,6 +195,30 @@
     </div>
   </div>
 
+  <h2>Top 25 Clients</h2>
+  <div class="card">
+    <div class="row-head">
+      <div><strong>Retail</strong>
+        <span class="pill">Account 110000 (Public)</span>
+        <span class="pill">grouped by phone</span>
+        <span class="pill">anonymised</span>
+      </div>
+    </div>
+    <div class="summary-strip" id="topRetailSummary"></div>
+    <table id="topRetailTable"></table>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="row-head">
+      <div><strong>Corporate</strong>
+        <span class="pill">all accounts ≠ 110000</span>
+        <span class="pill">grouped by Account Number</span>
+      </div>
+    </div>
+    <div class="summary-strip" id="topCorpSummary"></div>
+    <table id="topCorpTable"></table>
+  </div>
+
   <h2>OTP Airport — Pickup &amp; Destination by Service</h2>
   <div class="card">
     <p class="sub" style="margin:0 0 8px 0">Strict filter: pickup or destination text contains <code>OTP/LROP</code> or <code>OTOPENI Airport</code> (town addresses excluded).</p>
@@ -275,6 +299,7 @@
 <!--HOURS_PLACEHOLDER-->
 <!--REG_PLACEHOLDER-->
 <!--OTP_PLACEHOLDER-->
+<!--TOPCLIENTS_PLACEHOLDER-->
 
 <script>
 (function(){
@@ -648,6 +673,81 @@
     <td class="num ${dOverallCls}">${dOverallPct==null?'—':(dOverallPct>=0?'+':'')+dOverallPct.toFixed(1)+'%'}</td>
   </tr></tbody>`;
   document.getElementById('tblHoursPerJob').innerHTML = hpjHtml;
+
+  // ============================================================
+  // TOP 25 CLIENTS — Retail (anonymised) + Corporate (account #)
+  // ============================================================
+  const TC = window.__TOPCLIENTS__;
+  if (TC){
+    function renderTopClients(box, table, payload, labelFn){
+      const top = payload.top, ctx = payload.context;
+      // Summary chips
+      let tcj=0, tpj=0, tct=0, tpt=0, tce=0, tpe=0;
+      top.forEach(r=>{ tcj+=r.cur_jobs; tpj+=r.prev_jobs;
+        tct+=r.cur_total; tpt+=r.prev_total;
+        tce+=r.cur_earnings; tpe+=r.prev_earnings; });
+      function chip(label, val){ return `<span class="chip">${label}: <strong>${val}</strong></span>`; }
+      function chipΔ(label, c, p, fmt){
+        const d = c-p; const pct = p? ((c-p)/p)*100 : 0;
+        const cls = Math.abs(d)<0.005?'muted':(d>=0?'pos':'neg');
+        return `<span class="chip">${label}: <strong>${fmt(c)}</strong> vs <strong>${fmt(p)}</strong> <span class="${cls}">${pct>=0?'+':''}${pct.toFixed(1)}%</span></span>`;
+      }
+      box.innerHTML =
+        chip('Cur active clients (total)', fmtInt(ctx.cur_clients)) +
+        chip('Prev active clients',        fmtInt(ctx.prev_clients)) +
+        chipΔ('Top 25 Σ Total', tct, tpt, fmtMoney) +
+        chipΔ('Top 25 Σ Earnings', tce, tpe, fmtMoney) +
+        `<span class="chip">Share of segment: <strong>${(tct/ctx.cur_total*100).toFixed(1)}%</strong> cur · <strong>${(tpt/ctx.prev_total*100).toFixed(1)}%</strong> prev</span>`;
+
+      // Table
+      let html = `<thead><tr>
+        <th>Client</th>
+        <th>Cur jobs</th><th>Cur Σ Total</th><th>Cur Earnings</th>
+        <th>Prev jobs</th><th>Prev Σ Total</th><th>Prev Earnings</th>
+        <th>Σ jobs</th><th>Σ Total</th><th>Σ Earnings</th>
+      </tr></thead><tbody>`;
+      top.forEach(r=>{
+        html += `<tr>
+          <td>${labelFn(r)}</td>
+          <td class="num">${fmtInt(r.cur_jobs)}</td>
+          <td class="num">${fmtMoney(r.cur_total)}</td>
+          <td class="num">${fmtMoney(r.cur_earnings)}</td>
+          <td class="num muted">${fmtInt(r.prev_jobs)}</td>
+          <td class="num muted">${fmtMoney(r.prev_total)}</td>
+          <td class="num muted">${fmtMoney(r.prev_earnings)}</td>
+          <td class="num">${fmtInt(r.combined_jobs)}</td>
+          <td class="num">${fmtMoney(r.combined_total)}</td>
+          <td class="num">${fmtMoney(r.combined_earnings)}</td>
+        </tr>`;
+      });
+      html += `<tr style="font-weight:700">
+        <td>Total (top 25)</td>
+        <td class="num">${fmtInt(tcj)}</td>
+        <td class="num">${fmtMoney(tct)}</td>
+        <td class="num">${fmtMoney(tce)}</td>
+        <td class="num">${fmtInt(tpj)}</td>
+        <td class="num">${fmtMoney(tpt)}</td>
+        <td class="num">${fmtMoney(tpe)}</td>
+        <td class="num">${fmtInt(tcj+tpj)}</td>
+        <td class="num">${fmtMoney(tct+tpt)}</td>
+        <td class="num">${fmtMoney(tce+tpe)}</td>
+      </tr></tbody>`;
+      table.innerHTML = html;
+    }
+
+    renderTopClients(
+      document.getElementById('topRetailSummary'),
+      document.getElementById('topRetailTable'),
+      TC.retail,
+      r => r.client_id
+    );
+    renderTopClients(
+      document.getElementById('topCorpSummary'),
+      document.getElementById('topCorpTable'),
+      TC.corporate,
+      r => r.account_name ? `${r.account_no} — ${r.account_name}` : String(r.account_no)
+    );
+  }
 
   // ============================================================
   // OTP AIRPORT — pickup & destination by service

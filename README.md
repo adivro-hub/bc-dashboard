@@ -58,6 +58,8 @@ python build_dashboard.py        # → data.json (income structure)
 python build_jobs.py             # → jobs.json (excluded from public repo)
 python build_hours.py            # → hours.json
 python build_reg.py              # → registrations.json
+python build_otp.py              # → otp.json (OTP airport pickup/destination)
+python build_top_clients.py      # → top_clients.json (top 25 retail + corp)
 python embed_data.py             # → dashboard.html (full, with names)
 python embed_data.py --public    # → index.html (anonymised public build)
 ```
