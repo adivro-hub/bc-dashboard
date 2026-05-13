@@ -98,7 +98,8 @@ def build_leaderboard(cur_df, prev_df, key_field, value_to_label, base_label_fie
             "combined_earnings": (float(c["total"]) - float(c["driver"]))
                                  + (float(p["total"]) - float(p["driver"])),
         })
-    rows.sort(key=lambda r: r["combined_total"], reverse=True)
+    # Rank by number of rides (combined jobs) desc; tiebreak by Σ Total Price
+    rows.sort(key=lambda r: (r["combined_jobs"], r["combined_total"]), reverse=True)
     top = rows[:TOP_N]
     for r in top:
         extra = value_to_label(r["_key"], r)
