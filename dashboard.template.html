@@ -322,9 +322,9 @@
       <strong>#3 (Active cars %)</strong> needs a registered-fleet roster we don't have yet —
       replaced with "Unique active vehicles". <strong>#6</strong> only counts
       <em>explicit</em> no-supply cancel reasons; ~92% of cancellations have no documented
-      reason. <strong>#10</strong> shows <em>gross</em> commission
-      (Σ Total − Σ Driver) — bonuses/adjustments aren't in the data, so the net figure on
-      Income Structure runs ~15% lower.
+      reason. <strong>#10</strong> uses the spec formula
+      Σ(Client Price − Driver Price − bonuses − adjustments) with bonuses and adjustments
+      set to 0.
     </p>
     <div class="grid kpis" id="opsKpis"></div>
     <p class="sub" style="margin-top:18px">
@@ -1224,7 +1224,7 @@
       ['#7  Avg time to pickup (ASAP)',   d=>d.avg_time_to_pickup_min,   fmtMin, 'lower'],
       ['#8  Fulfilment rate',             d=>d.fulfilment_rate_pct,      fmtPctV, 'higher'],
       ['#9  Request→paid conversion',     d=>d.request_to_paid_pct,      fmtPctV, 'higher'],
-      ['#10 Gross commission (RON)',      d=>d.gross_commission,         fmtMoney, 'higher'],
+      ['#10 Total commission (RON)',      d=>d.gross_commission,         fmtMoney, 'higher'],
       ['#10 Monthly run-rate (RON)',      d=>d.monthly_run_rate,         fmtMoney, 'higher'],
     ];
 
