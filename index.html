@@ -333,7 +333,6 @@
       (already shown on Overview). <strong>Time to pickup</strong> uses the
       <em>Response Time</em> column on ASAP DONE jobs only.
       <strong>Fulfilment rate</strong> = DONE ÷ (DONE + CANCELLED).
-      <strong>Monthly run-rate</strong> = weekly commission × 4.345.
     </p>
   </div><!-- /view-ops -->
 
@@ -1225,7 +1224,6 @@
       ['#8  Fulfilment rate',             d=>d.fulfilment_rate_pct,      fmtPctV, 'higher'],
       ['#9  Request→paid conversion',     d=>d.request_to_paid_pct,      fmtPctV, 'higher'],
       ['#10 Total commission (RON)',      d=>d.gross_commission,         fmtMoney, 'higher'],
-      ['#10 Monthly run-rate (RON)',      d=>d.monthly_run_rate,         fmtMoney, 'higher'],
     ];
 
     defs.forEach(([label, get, fmt, semantics])=>{
