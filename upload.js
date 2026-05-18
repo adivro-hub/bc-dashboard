@@ -143,7 +143,7 @@
     if (!window.BCStore?.enabled) return;
     setStatus('Loading from shared store…');
     try {
-      const blob = await window.BCStore.loadAll();
+      const blob = await window.BCStore.loadAll(msg => setStatus(msg));
       // Replace the in-memory STORE with what came from the server.
       STORE.income_files = blob.income_files.map(f => ({
         source_name: f.source_name, period_from: f.period_from, period_to: f.period_to,

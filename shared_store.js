@@ -202,30 +202,49 @@ async function pushAccountNames(map){
 // -----------------------------------------------------------------
 // Reads (any signed-in member)
 // -----------------------------------------------------------------
-async function loadAll(){
+// Supabase caps a single SELECT at 1000 rows by default. job_rows easily
+// runs to 50k+, so we paginate with .range() until a short page comes back.
+async function fetchAll(table, orderBy){
+  const PAGE = 1000;
+  let out = [];
+  let from = 0;
+  while (true){
+    const q = client.from(table).select('*').order(orderBy).range(from, from + PAGE - 1);
+    const { data, error } = await q;
+    if (error) throw error;
+    if (!data || !data.length) break;
+    out = out.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
+async function loadAll(progress){
   if (!ENABLED) throw new Error('Supabase not configured');
-  // Fetch everything; the dashboard's date pickers slice client-side.
-  // For larger datasets we'd switch to range-scoped queries on job_rows.
-  const [income, hours, jobsFiles, jobsRows, regFiles, regRows, names] = await Promise.all([
-    client.from('income_files').select('*').order('period_from'),
-    client.from('hours_files').select('*').order('period_start'),
-    client.from('job_files').select('*').order('period_start'),
-    client.from('job_rows').select('*').order('date'),
-    client.from('reg_files').select('*').order('uploaded_at'),
-    client.from('reg_rows').select('*').order('created_at'),
-    client.from('account_names').select('*'),
-  ]);
-  const errs = [income, hours, jobsFiles, jobsRows, regFiles, regRows, names]
-    .map(r => r.error).filter(Boolean);
-  if (errs.length) throw new Error(errs.map(e=>e.message).join('; '));
+  const note = (msg) => { if (progress) progress(msg); };
+  note('Loading income files…');
+  const income     = await fetchAll('income_files', 'period_from');
+  note('Loading hours files…');
+  const hours      = await fetchAll('hours_files',  'period_start');
+  note('Loading job files…');
+  const jobsFiles  = await fetchAll('job_files',    'period_start');
+  note('Loading registration files…');
+  const regFiles   = await fetchAll('reg_files',    'uploaded_at');
+  note('Loading account names…');
+  const names      = await fetchAll('account_names','account_no');
+  note('Loading job rows (this is the big one)…');
+  const jobsRows   = await fetchAll('job_rows',     'date');
+  note('Loading registration rows…');
+  const regRows    = await fetchAll('reg_rows',     'created_at');
   return {
-    income_files: income.data || [],
-    hours_files:  hours.data  || [],
-    job_files:    jobsFiles.data || [],
-    job_rows:     jobsRows.data || [],
-    reg_files:    regFiles.data || [],
-    reg_rows:     regRows.data || [],
-    account_names: Object.fromEntries((names.data || []).map(r => [r.account_no, r.name])),
+    income_files: income,
+    hours_files:  hours,
+    job_files:    jobsFiles,
+    job_rows:     jobsRows,
+    reg_files:    regFiles,
+    reg_rows:     regRows,
+    account_names: Object.fromEntries(names.map(r => [r.account_no, r.name])),
   };
 }
 
