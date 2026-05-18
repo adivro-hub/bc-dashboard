@@ -16,6 +16,19 @@ Open it in any modern browser (it pulls Chart.js from a CDN).
 If GitHub Pages is enabled for this repo, it is served live at:
 `https://<owner>.github.io/<repo>/`
 
+### Upload your own reports
+
+Open `upload.html` in any browser and drop your weekly Excel exports onto
+the four file pickers (Income Structure, Job Analogue, Hour Statistics,
+Registration Info — 2 files each, current + previous week). The dashboard
+is parsed and rendered entirely in your browser; **files never leave your
+machine**.
+
+Click "Auto-detect file types" if you drop everything into the wrong
+zones — files are routed by content signature.
+
+Live URL: `https://<owner>.github.io/<repo>/upload.html`
+
 ## Layout
 
 1. **Headline KPIs** — total sales, jobs, earnings, avg/job, VAT.

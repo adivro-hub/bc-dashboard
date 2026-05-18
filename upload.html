@@ -3,11 +3,60 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Income Structure — Weekly Comparison</title>
+<title>BC Dashboard — Upload your reports</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="dashboard.css" />
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="parsers.js" defer></script>
+<script src="upload.js" defer></script>
 </head>
-<body>
+<body><div class="wrap" id="upload-wrap">
+  <header>
+    <h1>BC Dashboard — Upload your reports</h1>
+    <div class="sub">
+      Drop your weekly Excel exports below. Everything is processed in your
+      browser — files never leave your machine.
+    </div>
+  </header>
+
+  <div class="upload-grid">
+    <label class="drop" data-kind="income">
+      <h3>Income Structure</h3>
+      <p>2 files — current week + previous week</p>
+      <div class="files" data-files></div>
+      <input type="file" accept=".xls,.xlsx" multiple />
+    </label>
+
+    <label class="drop" data-kind="jobs">
+      <h3>Job Analogue</h3>
+      <p>2 files — current week + previous week</p>
+      <div class="files" data-files></div>
+      <input type="file" accept=".xls,.xlsx" multiple />
+    </label>
+
+    <label class="drop" data-kind="hours">
+      <h3>Hour Statistics</h3>
+      <p>2 files — current week + previous week</p>
+      <div class="files" data-files></div>
+      <input type="file" accept=".xls,.xlsx" multiple />
+    </label>
+
+    <label class="drop" data-kind="registrations">
+      <h3>Registration Info</h3>
+      <p>2 files — current week + previous week (optional)</p>
+      <div class="files" data-files></div>
+      <input type="file" accept=".xls,.xlsx" multiple />
+    </label>
+  </div>
+
+  <div class="actions">
+    <button id="generate" disabled>Generate dashboard</button>
+    <button class="secondary" id="auto-sort">Auto-detect file types</button>
+    <button class="secondary" id="reset">Reset</button>
+    <span id="status">Income Structure is required. Job Analogue + Hour Statistics enable the full dashboard.</span>
+  </div>
+</div>
+
 <div class="wrap">
   <header>
     <h1>Income Structure — Weekly Comparison</h1>
@@ -18,6 +67,7 @@
     </div>
   </header>
 
+  <div id="dashboard-area" style="display:none">
   <div class="tabs" id="tabs">
     <button data-tab="overview" class="active">Overview</button>
     <button data-tab="ops">Operational KPIs</button>
@@ -253,17 +303,18 @@
     </p>
   </div><!-- /view-ops -->
 
+</div><!-- /#dashboard-area -->
 </div><!-- /.wrap -->
 
-<!--DATA_PLACEHOLDER-->
-<!--JOBS_PLACEHOLDER-->
-<!--HOURS_PLACEHOLDER-->
-<!--REG_PLACEHOLDER-->
-<!--OTP_PLACEHOLDER-->
-<!--TOPCLIENTS_PLACEHOLDER-->
-<!--KPIS_PLACEHOLDER-->
+
+
+
+
+
+
+
 
 <script src="dashboard.js"></script>
-<script>renderDashboard();</script>
+
 </body>
 </html>

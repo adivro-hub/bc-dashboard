@@ -1,0 +1,46 @@
+<div class="wrap" id="upload-wrap">
+  <header>
+    <h1>BC Dashboard — Upload your reports</h1>
+    <div class="sub">
+      Drop your weekly Excel exports below. Everything is processed in your
+      browser — files never leave your machine.
+    </div>
+  </header>
+
+  <div class="upload-grid">
+    <label class="drop" data-kind="income">
+      <h3>Income Structure</h3>
+      <p>2 files — current week + previous week</p>
+      <div class="files" data-files></div>
+      <input type="file" accept=".xls,.xlsx" multiple />
+    </label>
+
+    <label class="drop" data-kind="jobs">
+      <h3>Job Analogue</h3>
+      <p>2 files — current week + previous week</p>
+      <div class="files" data-files></div>
+      <input type="file" accept=".xls,.xlsx" multiple />
+    </label>
+
+    <label class="drop" data-kind="hours">
+      <h3>Hour Statistics</h3>
+      <p>2 files — current week + previous week</p>
+      <div class="files" data-files></div>
+      <input type="file" accept=".xls,.xlsx" multiple />
+    </label>
+
+    <label class="drop" data-kind="registrations">
+      <h3>Registration Info</h3>
+      <p>2 files — current week + previous week (optional)</p>
+      <div class="files" data-files></div>
+      <input type="file" accept=".xls,.xlsx" multiple />
+    </label>
+  </div>
+
+  <div class="actions">
+    <button id="generate" disabled>Generate dashboard</button>
+    <button class="secondary" id="auto-sort">Auto-detect file types</button>
+    <button class="secondary" id="reset">Reset</button>
+    <span id="status">Income Structure is required. Job Analogue + Hour Statistics enable the full dashboard.</span>
+  </div>
+</div>

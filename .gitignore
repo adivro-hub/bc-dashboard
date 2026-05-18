@@ -18,6 +18,12 @@ tool-results/
 # Standard ignores
 # =====================================================================
 .claude/
+
+# Dev/exploration scripts and ad-hoc CSV exports — not part of the dashboard
+peek_*.py
+find_*.py
+otp_by_service.py
+otp_*.csv
 __pycache__/
 *.pyc
 .vscode/
