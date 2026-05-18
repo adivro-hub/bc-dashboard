@@ -25,8 +25,11 @@ find_*.py
 otp_by_service.py
 otp_*.csv
 
-# Local Supabase config (URL + anon key) — each deployment has its own
-config.js
+# Per-org deploys may keep config.js out of git. We commit it here because
+# the anon key is *meant* to be public (security comes from RLS in Postgres,
+# enforced server-side), and the org wants the URL to "just work" for the
+# team without env-var ceremony.
+# config.js
 new reports/
 __pycache__/
 *.pyc
