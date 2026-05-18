@@ -23,6 +23,7 @@
     reg_files:    [],
     raw_files:    [],   // [{name, kind}] for the visible file list
     coverage:     { from: null, to: null },
+    _fileHashes:  new Set(),   // SHA-256 of bytes — skip duplicate uploads
   };
 
   const dropAll  = document.getElementById('drop-all');
@@ -51,9 +52,15 @@
 
   async function handleFiles(fileList){
     setStatus(`Reading ${fileList.length} file${fileList.length===1?'':'s'}…`);
+    let dupCount = 0;
     for (const f of fileList){
       try {
-        const wb = await readWorkbook(f);
+        const buf = await f.arrayBuffer();
+        const hash = await sha256hex(new Uint8Array(buf));
+        // Skip if we've already ingested an identical file (same bytes).
+        if (STORE._fileHashes.has(hash)) { dupCount++; continue; }
+        STORE._fileHashes.add(hash);
+        const wb = XLSX.read(buf, { type: 'array', cellDates: true });
         const kind = BCParsers.detectFileType(wb);
         const file = { name: f.name, workbook: wb };
         if (kind === 'income'){
@@ -79,7 +86,13 @@
     recomputeCoverage();
     refreshSummary();
     suggestDefaultPeriods();
-    setStatus('Files loaded. Pick periods and click Generate dashboard.', 'ok');
+    const note = dupCount ? ` (${dupCount} duplicate file${dupCount===1?'':'s'} skipped)` : '';
+    setStatus(`Files loaded${note}. Pick periods and click Generate dashboard.`, 'ok');
+  }
+
+  async function sha256hex(bytes){
+    const h = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join('');
   }
 
   function recomputeCoverage(){

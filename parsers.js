@@ -747,10 +747,20 @@ function aggregateIncome(parsedFiles, from, to){
   // each contributing file must be fully contained inside [from, to]. If a
   // file straddles the boundary (partial coverage), bail and let the caller
   // synthesise totals from per-row job data.
-  const used = parsedFiles.filter(f =>
+  // Also: deduplicate by period — multiple files covering the same range are
+  // counted once (the user may have re-exported the same period twice).
+  const inRange = parsedFiles.filter(f =>
     f.period_from >= from && f.period_to <= to);
-  if (!used.length){
+  if (!inRange.length){
     return null;
+  }
+  const seen = new Set();
+  const used = [];
+  for (const f of inRange){
+    const key = `${f.period_from}|${f.period_to}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    used.push(f);
   }
   const sections = {};
   for (const k of ["sales","payment_type","customer_grade","service","fleet","driver_hours"]){
