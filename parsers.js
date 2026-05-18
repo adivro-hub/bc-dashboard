@@ -163,7 +163,14 @@ function parseJobAnalogue(workbook){
   const colUrgency     = idx("Urgency");
   const colStatus      = idx("Status");
   const colService     = idx("Service");
+  const colJobDate     = idx("Job Date");
   const colJobTime     = idx("Job Time");
+  const colPickup      = idx("Pick Up");
+  const colDrop        = idx("Drop Off");
+  const colVeh         = idx("Vehicle Reg Number");
+  const colCancel      = idx("Cancel Reason");
+  const colResponse    = idx("Response Time");
+  const colPhone       = idx("Passenger Telephone");
   const colTotal       = idx("Total Price");
   const colDriverTotal = idx("Driver Total Price");
 
@@ -176,19 +183,38 @@ function parseJobAnalogue(workbook){
     if (accNo == null && jobNo == null) continue;
     const accNoStr = (typeof accNo === 'number' && Number.isInteger(accNo))
                        ? String(accNo) : toStr(accNo);
+    const jd = toDate(r[colJobDate]);
     out.push({
-      account_no:   accNoStr,
-      account_name: toStr(r[colAccountName]),
-      job_no:       toStr(r[colJobNo]),
-      urgency:      toStr(r[colUrgency]),
-      status:       toStr(r[colStatus]),
-      service:      toStr(r[colService]),
-      hour:         hourOf(r[colJobTime]),
-      total:        toNum(r[colTotal]),
-      driver_total: toNum(r[colDriverTotal]),
+      account_no:    accNoStr,
+      account_name:  toStr(r[colAccountName]),
+      job_no:        toStr(r[colJobNo]),
+      urgency:       toStr(r[colUrgency]),
+      status:        toStr(r[colStatus]),
+      service:       toStr(r[colService]),
+      // ISO date string for filtering (just yyyy-mm-dd)
+      date:          jd ? isoDate(jd) : null,
+      hour:          hourOf(r[colJobTime]),
+      pickup:        toStr(r[colPickup]),
+      dropoff:       toStr(r[colDrop]),
+      vehicle:       toStr(r[colVeh]),
+      cancel_reason: toStr(r[colCancel]),
+      response_min:  timeToMinutes(r[colResponse]),
+      phone:         normalisePhoneShared(r[colPhone]),
+      total:         toNum(r[colTotal]),
+      driver_total:  toNum(r[colDriverTotal]),
     });
   }
   return out;
+}
+
+// Phone normaliser shared with top-clients logic
+function normalisePhoneShared(v){
+  if (v == null) return "";
+  const s = String(v).trim();
+  if (!s || s.toLowerCase() === "nan") return "";
+  const digits = s.replace(/\D/g, '');
+  if (!digits || /^0+$/.test(digits)) return "";
+  return digits;
 }
 
 // =====================================================================
@@ -274,9 +300,15 @@ function parseHours(workbook){
     peak_busy:       Math.max(...series.doing_job),
   };
 
+  // Store timestamps as local "YYYY-MM-DDTHH:00" strings to avoid UTC offset
+  // chopping boundary hours when the user filters by date range.
+  function localTs(d){
+    const p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:00`;
+  }
   return {
     period,
-    timestamps: hourlyCols.map(([_, ts]) => ts.toISOString()),
+    timestamps: hourlyCols.map(([_, ts]) => localTs(ts)),
     hourly: series,
     by_hour_of_day: byHour,
     derived,
@@ -683,6 +715,382 @@ function detectFileType(workbook){
 }
 
 // =====================================================================
+// AGGREGATION HELPERS — combine multiple files into one period view
+// =====================================================================
+
+// Two ISO date strings overlap a [from,to] range (inclusive both ends)?
+function rangeOverlaps(aFrom, aTo, bFrom, bTo){
+  return aFrom <= bTo && aTo >= bFrom;
+}
+function inRange(d, from, to){
+  return d != null && d >= from && d <= to;
+}
+
+// Sum two metric rows
+function sumMetric(a, b){
+  return {
+    jobs:        (a?.jobs        || 0) + (b?.jobs        || 0),
+    without_vat: (a?.without_vat || 0) + (b?.without_vat || 0),
+    vat:         (a?.vat         || 0) + (b?.vat         || 0),
+    total:       (a?.total       || 0) + (b?.total       || 0),
+    earnings:    (a?.earnings    || 0) + (b?.earnings    || 0),
+  };
+}
+
+// Aggregate Income Structure: sum all files whose period overlaps [from,to].
+// Income files are file-level aggregates — they cannot be sliced by day. We
+// include any file that overlaps the requested range and warn if there's a
+// mismatch (handled in the UI). Returns { period_from, period_to, sections,
+// kpis, contributing_files: [{name, period_from, period_to}] }.
+function aggregateIncome(parsedFiles, from, to){
+  // Only use real income files when the user's range can be tiled cleanly:
+  // each contributing file must be fully contained inside [from, to]. If a
+  // file straddles the boundary (partial coverage), bail and let the caller
+  // synthesise totals from per-row job data.
+  const used = parsedFiles.filter(f =>
+    f.period_from >= from && f.period_to <= to);
+  if (!used.length){
+    return null;
+  }
+  const sections = {};
+  for (const k of ["sales","payment_type","customer_grade","service","fleet","driver_hours"]){
+    sections[k] = {};
+  }
+  for (const f of used){
+    for (const sk of Object.keys(sections)){
+      const src = f.sections[sk] || {};
+      for (const itemKey of Object.keys(src)){
+        sections[sk][itemKey] = sumMetric(sections[sk][itemKey], src[itemKey]);
+      }
+    }
+  }
+  // Recompute KPIs from "Sales" section
+  const wv = sections.sales["Sales with VAT"]   || {jobs:0,without_vat:0,vat:0,total:0,earnings:0};
+  const nv = sections.sales["Sales with No VAT"] || {jobs:0,without_vat:0,vat:0,total:0,earnings:0};
+  const totalJobs = wv.jobs + nv.jobs;
+  const totalRev  = wv.total + nv.total;
+  return {
+    period_from: from,
+    period_to:   to,
+    sections,
+    kpis: {
+      jobs: totalJobs,
+      without_vat: wv.without_vat + nv.without_vat,
+      vat:         wv.vat + nv.vat,
+      total:       totalRev,
+      earnings:    wv.earnings + nv.earnings,
+      avg_per_job: totalJobs ? totalRev/totalJobs : 0,
+    },
+    contributing_files: used.map(f => ({ name: f.source_name, period_from: f.period_from, period_to: f.period_to })),
+    coverage_warning:   computeCoverageWarning(used, from, to),
+  };
+}
+function computeCoverageWarning(files, from, to){
+  // Detect if file dates don't tile the requested range cleanly
+  const days = (d => d.from + ' → ' + d.to);
+  for (const f of files){
+    if (f.period_from < from || f.period_to > to){
+      return `One or more income files extend outside the selected range (${f.period_from} → ${f.period_to}); totals include the full file.`;
+    }
+  }
+  return null;
+}
+
+// Aggregate Hours: concatenate timestamps + series from all files whose any
+// timestamp falls in [from, to]; recompute by_hour_of_day rollup and derived
+// metrics. Output schema matches parseHours.
+function aggregateHours(parsedFiles, from, to){
+  // Collect all (ts, metric values) tuples within range from all files
+  const allEntries = [];
+  for (const f of parsedFiles){
+    for (let i = 0; i < f.timestamps.length; i++){
+      const tsIso = f.timestamps[i].slice(0,10);
+      if (tsIso >= from && tsIso <= to){
+        const row = {};
+        for (const k of Object.keys(f.hourly)) row[k] = f.hourly[k][i];
+        allEntries.push({ ts: f.timestamps[i], row });
+      }
+    }
+  }
+  if (!allEntries.length) return null;
+  // Sort chronologically (in case files came in arbitrary order)
+  allEntries.sort((a,b) => a.ts.localeCompare(b.ts));
+
+  const metricKeys = Object.values(HOURS_METRIC_KEY);
+  const series = {};
+  for (const k of metricKeys) series[k] = [];
+  const timestamps = [];
+  for (const e of allEntries){
+    timestamps.push(e.ts);
+    for (const k of metricKeys) series[k].push(e.row[k] || 0);
+  }
+  // by-hour-of-day average
+  const byHour = {}; for (const k of metricKeys) byHour[k] = new Array(24).fill(0);
+  const counts = new Array(24).fill(0);
+  for (let i = 0; i < timestamps.length; i++){
+    const h = new Date(timestamps[i]).getHours();
+    counts[h]++;
+    for (const k of metricKeys) byHour[k][h] += series[k][i];
+  }
+  for (const k of metricKeys){
+    byHour[k] = byHour[k].map((v,h) => counts[h] ? v/counts[h] : 0);
+  }
+  const onlineTotal  = series.online.reduce((s,v)=>s+v,0);
+  const onBreakTotal = series.on_break.reduce((s,v)=>s+v,0);
+  const busyTotal    = series.doing_job.reduce((s,v)=>s+v,0);
+  const avail        = onlineTotal - onBreakTotal;
+  const derived = {
+    available_total: avail,
+    busy_total:      busyTotal,
+    online_total:    onlineTotal,
+    on_break_total:  onBreakTotal,
+    util_avg:        avail ? busyTotal/avail : 0,
+    peak_available:  Math.max(...series.online.map((o,i)=>o - series.on_break[i])),
+    peak_busy:       Math.max(...series.doing_job),
+  };
+  return {
+    period: `${from} → ${to}`,
+    timestamps,
+    hourly: series,
+    by_hour_of_day: byHour,
+    derived,
+    contributing_files: parsedFiles.map(f => f.source_name),
+  };
+}
+
+// Aggregate Job Analogue: filter all rows by date range. Returns flat array.
+function aggregateJobs(allJobRows, from, to){
+  return allJobRows.filter(r => r.date && r.date >= from && r.date <= to);
+}
+
+// Aggregate Registrations: same as parseRegistrations but the period is the
+// user-picked range, applied across all loaded files.
+function aggregateRegistrations(parsedFiles, from, to){
+  // parsedFiles: [{ name, rows: [{email, created (Date), status, src}, ...] }]
+  // Dedup across files by (email, created)
+  const seen = new Set();
+  const all = [];
+  let dropped = 0;
+  for (const f of parsedFiles){
+    for (const r of f.rows){
+      const key = `${r.email}|${r.created.getTime()}`;
+      if (seen.has(key)){ dropped++; continue; }
+      seen.add(key);
+      all.push(r);
+    }
+  }
+  const fromTs = new Date(from + "T00:00:00").getTime();
+  const toTs   = new Date(to   + "T23:59:59").getTime();
+  const inP = all.filter(r => {
+    const t = r.created.getTime();
+    return t >= fromTs && t <= toTs;
+  });
+  const summary = { total: 0, by_status: {}, daily: {} };
+  function localDate(d){
+    const p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  }
+  for (const r of inP){
+    summary.total++;
+    const st = r.status || '(unknown)';
+    summary.by_status[st] = (summary.by_status[st] || 0) + 1;
+    const d = localDate(r.created);
+    summary.daily[d] = (summary.daily[d] || 0) + 1;
+  }
+  return summary;
+}
+
+// Parse registrations into per-file rows (so we can re-aggregate across ranges).
+function parseRegistrationsPerFile(file /* {name, workbook} */){
+  const ws = file.workbook.Sheets[file.workbook.SheetNames[0]];
+  const data = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, blankrows:false});
+  if (!data.length) return { name: file.name, rows: [], min: null, max: null };
+  const header = data[0].map(h => toStr(h));
+  const iEmail   = header.indexOf("Email");
+  const iStatus  = header.indexOf("Status");
+  const iCreated = header.indexOf("Created At");
+  const rows = [];
+  let minD = null, maxD = null;
+  for (let i = 1; i < data.length; i++){
+    const d = toDate(data[i] && data[i][iCreated]);
+    if (!d) continue;
+    rows.push({ email: toStr(data[i][iEmail]), created: d, status: toStr(data[i][iStatus]), src: file.name });
+    if (!minD || d < minD) minD = d;
+    if (!maxD || d > maxD) maxD = d;
+  }
+  return { name: file.name, rows, min: minD, max: maxD };
+}
+
+// =====================================================================
+// PERIOD BUILDER — takes a slice of job rows + aggregated hours + agg income
+// and produces all the per-period payloads the dashboard expects.
+// =====================================================================
+// SUPPLY_RE is defined earlier (used by the legacy buildKpis path too).
+
+function buildPeriodPayloads(income, hours, jobRows){
+  // OTP — use rows' pickup/dropoff fields
+  function otpAggregate(side){
+    const out = {};
+    for (const r of jobRows){
+      const text = r[side] || '';
+      if (!OTP_AIRPORT_RE.test(text)) continue;
+      const s = r.service || '(blank)';
+      if (!out[s]) out[s] = { jobs: 0, total: 0 };
+      out[s].jobs += 1;
+      out[s].total += r.total || 0;
+    }
+    return out;
+  }
+  const otp = { pickup: otpAggregate('pickup'), dropoff: otpAggregate('dropoff') };
+
+  // Operational KPIs
+  const done   = jobRows.filter(r => r.status === 'DONE');
+  const cancel = jobRows.filter(r => r.status === 'CANCELLED');
+  const vehicles = new Set();
+  for (const r of done){ if (r.vehicle) vehicles.add(r.vehicle); }
+  const periodDays = countDaysInRange(income?.period_from, income?.period_to)
+                     || countDaysInRange(jobRows[0]?.date, jobRows[jobRows.length-1]?.date)
+                     || 1;
+  const onlineHours = hours?.derived?.online_total || 0;
+  const noSupply    = cancel.filter(r => SUPPLY_RE.test(r.cancel_reason || '')).length;
+  const asapDone    = done.filter(r => (r.urgency || '').toUpperCase() === 'ASAP');
+  const respMin     = asapDone.map(r => r.response_min).filter(v => v != null);
+  const mean = a => a.length ? a.reduce((s,v)=>s+v,0)/a.length : 0;
+  const median = a => {
+    if (!a.length) return 0;
+    const s = [...a].sort((x,y)=>x-y);
+    const m = s.length >> 1;
+    return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+  };
+  const totPrice = done.reduce((s,r)=>s+r.total, 0);
+  const drvPrice = done.reduce((s,r)=>s+r.driver_total, 0);
+  const ful = (done.length+cancel.length) ? (done.length/(done.length+cancel.length))*100 : 0;
+  const kpis = {
+    total_login_hours: onlineHours,
+    login_h_per_car_per_day: vehicles.size ? onlineHours / vehicles.size / periodDays : 0,
+    unique_active_vehicles: vehicles.size,
+    fleet_utilisation_pct: (hours?.derived?.util_avg || 0) * 100,
+    jobs_per_online_hour: onlineHours ? done.length/onlineHours : 0,
+    no_supply_cancels: noSupply,
+    no_supply_pct_of_cancel: cancel.length ? (noSupply/cancel.length)*100 : 0,
+    avg_time_to_pickup_min: mean(respMin),
+    median_time_to_pickup_min: median(respMin),
+    asap_done_jobs: asapDone.length,
+    fulfilment_rate_pct: ful,
+    request_to_paid_pct: ful,
+    done_jobs: done.length,
+    cancelled_jobs: cancel.length,
+    total_bookings: jobRows.length,
+    total_price: totPrice,
+    driver_price: drvPrice,
+    gross_commission: totPrice - drvPrice,
+  };
+
+  return { otp, kpis };
+}
+
+function countDaysInRange(from, to){
+  if (!from || !to) return 0;
+  const d1 = new Date(from), d2 = new Date(to);
+  return Math.max(1, Math.round((d2 - d1)/86400000) + 1);
+}
+
+// Top clients across two periods given filtered job-row arrays.
+function buildTopClientsFromRows(curRows, prevRows){
+  function aggregate(rows, keyFn, filterFn){
+    const out = {};
+    for (const r of rows){
+      if (filterFn && !filterFn(r)) continue;
+      const k = keyFn(r);
+      if (!out[k]) out[k] = { jobs: 0, total: 0, driver: 0 };
+      out[k].jobs++; out[k].total += r.total; out[k].driver += r.driver_total;
+    }
+    return out;
+  }
+  const isRetail = r => r.account_no === PUBLIC_ACCOUNT && r.phone !== "";
+  const isCorp = r => r.account_no && r.account_no !== PUBLIC_ACCOUNT && !EXCLUDED_CORP.has(r.account_no);
+
+  const curRetail  = aggregate(curRows,  r => r.phone, isRetail);
+  const prevRetail = aggregate(prevRows, r => r.phone, isRetail);
+  const curCorp    = aggregate(curRows,  r => r.account_no, isCorp);
+  const prevCorp   = aggregate(prevRows, r => r.account_no, isCorp);
+
+  const nameMap = {};
+  for (const r of [...curRows, ...prevRows]){
+    if (isCorp(r) && r.account_name && !nameMap[r.account_no]){
+      nameMap[r.account_no] = r.account_name;
+    }
+  }
+
+  function rank(cur, prev, valueToLabel){
+    const keys = new Set([...Object.keys(cur), ...Object.keys(prev)]);
+    const rows = [];
+    for (const k of keys){
+      const c = cur[k] || {jobs:0,total:0,driver:0};
+      const p = prev[k] || {jobs:0,total:0,driver:0};
+      rows.push({
+        _key: k,
+        cur_jobs: c.jobs, cur_total: c.total, cur_earnings: c.total - c.driver,
+        prev_jobs: p.jobs, prev_total: p.total, prev_earnings: p.total - p.driver,
+        combined_jobs: c.jobs + p.jobs,
+        combined_total: c.total + p.total,
+        combined_earnings: (c.total - c.driver) + (p.total - p.driver),
+      });
+    }
+    rows.sort((a,b) => b.combined_jobs - a.combined_jobs || b.combined_total - a.combined_total);
+    const top = rows.slice(0, TOP_N);
+    for (const r of top){
+      Object.assign(r, valueToLabel(r._key));
+      delete r._key;
+    }
+    return top;
+  }
+  const retailTop = rank(curRetail, prevRetail, k => ({ client_id: "" }));
+  retailTop.forEach((r,i) => r.client_id = `Client #${i+1}`);
+  const corpTop = rank(curCorp, prevCorp, k => ({
+    account_no:   isNaN(+k) ? k : +k,
+    account_name: nameMap[k] || "",
+  }));
+
+  function totalRevenue(rows, filter){ let t = 0; for (const r of rows) if (filter(r)) t += r.total; return t; }
+  function uniqueKey(rows, filter, key){ const s = new Set(); for (const r of rows) if (filter(r)) s.add(key(r)); return s.size; }
+
+  return {
+    retail: {
+      top: retailTop,
+      context: {
+        cur_clients:  uniqueKey(curRows, isRetail, r=>r.phone),
+        prev_clients: uniqueKey(prevRows, isRetail, r=>r.phone),
+        cur_total:    totalRevenue(curRows, isRetail),
+        prev_total:   totalRevenue(prevRows, isRetail),
+      },
+    },
+    corporate: {
+      top: corpTop,
+      context: {
+        cur_clients:  uniqueKey(curRows, isCorp, r=>r.account_no),
+        prev_clients: uniqueKey(prevRows, isCorp, r=>r.account_no),
+        cur_total:    totalRevenue(curRows, isCorp),
+        prev_total:   totalRevenue(prevRows, isCorp),
+      },
+    },
+  };
+}
+
+// Parse Income per file (adds source_name)
+function parseIncomePerFile(file){
+  const out = parseIncome(file.workbook);
+  out.source_name = file.name;
+  return out;
+}
+// Parse Hours per file (adds source_name)
+function parseHoursPerFile(file){
+  const out = parseHours(file.workbook);
+  out.source_name = file.name;
+  return out;
+}
+
+// =====================================================================
 // PUBLIC API
 // =====================================================================
 window.BCParsers = {
@@ -695,6 +1103,16 @@ window.BCParsers = {
   buildTopClients,
   buildKpis,
   detectFileType,
+  // Period-based aggregation pipeline
+  parseIncomePerFile,
+  parseHoursPerFile,
+  parseRegistrationsPerFile,
+  aggregateIncome,
+  aggregateHours,
+  aggregateJobs,
+  aggregateRegistrations,
+  buildPeriodPayloads,
+  buildTopClientsFromRows,
   // helpers exposed for upload.js
   toDate, isoDate,
 };

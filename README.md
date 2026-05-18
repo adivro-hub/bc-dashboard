@@ -18,16 +18,26 @@ If GitHub Pages is enabled for this repo, it is served live at:
 
 ### Upload your own reports
 
-Open `upload.html` in any browser and drop your weekly Excel exports onto
-the four file pickers (Income Structure, Job Analogue, Hour Statistics,
-Registration Info — 2 files each, current + previous week). The dashboard
-is parsed and rendered entirely in your browser; **files never leave your
-machine**.
+Open `upload.html` in any browser and drop any number of Excel exports
+onto the single drop zone. Files are classified by content (Income
+Structure / Job Analogue / Hour Statistics / Registration Info) and
+parsed in your browser — **files never leave your machine**.
 
-Click "Auto-detect file types" if you drop everything into the wrong
-zones — files are routed by content signature.
+After upload, pick **any two date ranges** to compare (day-vs-day,
+week-vs-week, month-vs-month, anything). Income Structure exports are
+file-level aggregates; when your range doesn't tile cleanly to a file
+boundary, the income KPIs are synthesised from per-row Job Analogue
+data instead.
+
+Re-pick periods freely without re-uploading.
 
 Live URL: `https://<owner>.github.io/<repo>/upload.html`
+
+### Deploy to Vercel
+
+The repo is a pure static site, so Vercel deploys it as-is. `vercel.json`
+sets cache headers for the HTML/CSS/JS assets. Connect the GitHub repo
+on Vercel and push to deploy — no build step needed.
 
 ## Layout
 

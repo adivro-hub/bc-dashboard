@@ -1,46 +1,67 @@
 <div class="wrap" id="upload-wrap">
   <header>
-    <h1>BC Dashboard — Upload your reports</h1>
+    <h1>BC Dashboard — Bring your own reports</h1>
     <div class="sub">
-      Drop your weekly Excel exports below. Everything is processed in your
-      browser — files never leave your machine.
+      Drop your Excel exports — any number of files, any week. They are parsed
+      in your browser and never leave your machine. Pick any two periods to
+      compare (a day, a week, a month — anything).
     </div>
   </header>
 
-  <div class="upload-grid">
-    <label class="drop" data-kind="income">
-      <h3>Income Structure</h3>
-      <p>2 files — current week + previous week</p>
-      <div class="files" data-files></div>
-      <input type="file" accept=".xls,.xlsx" multiple />
-    </label>
+  <label class="drop drop-all" id="drop-all">
+    <h3>Drop all your reports here</h3>
+    <p>Income Structure · Job Analogue · Hour Statistics · Registration Info</p>
+    <p class="sub">Files are classified by their content. Click or drop.</p>
+    <input type="file" accept=".xls,.xlsx" multiple />
+  </label>
 
-    <label class="drop" data-kind="jobs">
-      <h3>Job Analogue</h3>
-      <p>2 files — current week + previous week</p>
-      <div class="files" data-files></div>
-      <input type="file" accept=".xls,.xlsx" multiple />
-    </label>
+  <div id="files-summary" style="display:none">
+    <h2 style="margin-top:24px">Files loaded</h2>
+    <div class="summary-strip" id="files-strip"></div>
+    <div class="card" style="margin-top:12px">
+      <div id="files-list" class="sub" style="font-size:12px;max-height:160px;overflow-y:auto"></div>
+    </div>
 
-    <label class="drop" data-kind="hours">
-      <h3>Hour Statistics</h3>
-      <p>2 files — current week + previous week</p>
-      <div class="files" data-files></div>
-      <input type="file" accept=".xls,.xlsx" multiple />
-    </label>
+    <h2 style="margin-top:24px">Pick the two periods to compare</h2>
+    <p class="sub" style="margin-top:-8px">
+      Defaults: <strong>Current</strong> = the most recent full week in your
+      data, <strong>Previous</strong> = the week before. Change either to
+      compare any custom range (day, week, month, anything).
+    </p>
 
-    <label class="drop" data-kind="registrations">
-      <h3>Registration Info</h3>
-      <p>2 files — current week + previous week (optional)</p>
-      <div class="files" data-files></div>
-      <input type="file" accept=".xls,.xlsx" multiple />
-    </label>
-  </div>
+    <div class="period-pickers">
+      <div class="card period-card">
+        <div class="row-head"><div><strong>Current period</strong></div></div>
+        <div class="period-inputs">
+          <label>From <input type="date" id="curFrom" /></label>
+          <label>To   <input type="date" id="curTo" /></label>
+        </div>
+        <div class="period-presets">
+          <button data-preset="last7" data-target="cur">Last 7 days</button>
+          <button data-preset="last30" data-target="cur">Last 30 days</button>
+          <button data-preset="lastWeek" data-target="cur">Most recent full week</button>
+          <button data-preset="lastMonth" data-target="cur">Most recent full month</button>
+        </div>
+      </div>
 
-  <div class="actions">
-    <button id="generate" disabled>Generate dashboard</button>
-    <button class="secondary" id="auto-sort">Auto-detect file types</button>
-    <button class="secondary" id="reset">Reset</button>
-    <span id="status">Income Structure is required. Job Analogue + Hour Statistics enable the full dashboard.</span>
+      <div class="card period-card">
+        <div class="row-head"><div><strong>Previous period</strong></div></div>
+        <div class="period-inputs">
+          <label>From <input type="date" id="prevFrom" /></label>
+          <label>To   <input type="date" id="prevTo" /></label>
+        </div>
+        <div class="period-presets">
+          <button data-preset="priorEqual" data-target="prev">Equal range right before current</button>
+          <button data-preset="lastWeek-1" data-target="prev">Week before current</button>
+          <button data-preset="lastMonth-1" data-target="prev">Month before current</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="generate" disabled>Generate dashboard</button>
+      <button class="secondary" id="reset">Reset all</button>
+      <span id="status"></span>
+    </div>
   </div>
 </div>

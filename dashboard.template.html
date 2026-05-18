@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Income Structure — Weekly Comparison</title>
+<title>Operations Dashboard — Period Comparison</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="dashboard.css" />
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Income Structure — Weekly Comparison</h1>
+    <h1>Operations Dashboard — Period Comparison</h1>
     <div class="sub" id="periodLine"></div>
     <div class="legend">
-      <span><span class="dot" style="background:var(--curr)"></span>Current week</span>
-      <span><span class="dot" style="background:var(--prev)"></span>Previous week</span>
+      <span><span class="dot" style="background:var(--curr)"></span>Current period</span>
+      <span><span class="dot" style="background:var(--prev)"></span>Previous period</span>
     </div>
   </header>
 
@@ -43,7 +43,7 @@
     </div>
   </div>
 
-  <h2>Sales composition (current week share %)</h2>
+  <h2>Sales composition (current period share %)</h2>
   <div class="grid panels">
     <div class="card">
       <div class="row-head"><div><strong>By Payment Type</strong></div></div>
@@ -63,7 +63,7 @@
     </div>
   </div>
 
-  <h2>Week-over-week comparison — Sales (Total RON)</h2>
+  <h2>Period-over-period comparison — Sales (Total RON)</h2>
 
   <div class="card">
     <div class="row-head"><div><strong>By Payment Type</strong><span class="pill">Total RON</span></div></div>
@@ -121,11 +121,11 @@
 
   <div class="grid panels" style="margin-top:14px">
     <div class="card">
-      <div class="row-head"><div><strong>Current week timeline</strong> <span class="pill" id="hourCurPeriod"></span></div></div>
+      <div class="row-head"><div><strong>Current period timeline</strong> <span class="pill" id="hourCurPeriod"></span></div></div>
       <div class="chart-wrap tall"><canvas id="hourCurChart"></canvas></div>
     </div>
     <div class="card">
-      <div class="row-head"><div><strong>Previous week timeline</strong> <span class="pill" id="hourPrevPeriod"></span></div></div>
+      <div class="row-head"><div><strong>Previous period timeline</strong> <span class="pill" id="hourPrevPeriod"></span></div></div>
       <div class="chart-wrap tall"><canvas id="hourPrevChart"></canvas></div>
     </div>
   </div>
@@ -218,11 +218,11 @@
 
     <div class="pivot-wrap">
       <div>
-        <h3>Current week (<span id="pivotPeriodCur"></span>)</h3>
+        <h3>Current period (<span id="pivotPeriodCur"></span>)</h3>
         <table id="pivotCur"></table>
       </div>
       <div>
-        <h3>Previous week (<span id="pivotPeriodPrev"></span>)</h3>
+        <h3>Previous period (<span id="pivotPeriodPrev"></span>)</h3>
         <table id="pivotPrev"></table>
       </div>
     </div>
@@ -235,11 +235,12 @@
   <div class="view" data-view="ops">
     <h2>Operational KPIs</h2>
     <p class="sub" style="margin-top:-8px;margin-bottom:18px">
-      Current week vs previous week. KPI numbering matches the spec sheet.
+      Current period vs previous period. KPI numbering matches the spec sheet.
       <strong>#3 (Active cars %)</strong> needs a registered-fleet roster we don't have yet —
-      replaced with "Unique active vehicles". <strong>#6</strong> only counts
-      <em>explicit</em> no-supply cancel reasons; ~92% of cancellations have no documented
-      reason. <strong>#10</strong> uses the spec formula
+      replaced with "Unique active vehicles". <strong>#6</strong> shows <em>all</em>
+      cancelled rides for now — ~92% of cancellations have no documented reason,
+      so a true "lack of supply" split isn't available yet (waiting on better
+      cancel-reason data). <strong>#10</strong> uses the spec formula
       Σ(Client Price − Driver Price − bonuses − adjustments) with bonuses and adjustments
       set to 0.
     </p>

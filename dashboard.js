@@ -83,13 +83,13 @@ window.renderDashboard = function renderDashboard(){
     const arrow = cls==='up'?'▲':cls==='down'?'▼':'■';
     document.getElementById('regKpis').innerHTML = `
       <div class="card kpi">
-        <div class="label">Current week</div>
+        <div class="label">Current period</div>
         <div class="value num">${fmtInt(sCur.total)}</div>
         <div class="prev num">prev ${fmtInt(sPrev.total)}</div>
         <span class="delta ${cls}">${arrow} ${(pTot>=0?'+':'')+pTot.toFixed(1)}% (${dTot>=0?'+':''}${fmtInt(dTot)})</span>
       </div>
       <div class="card kpi">
-        <div class="label">Combined (both weeks)</div>
+        <div class="label">Combined (both periods)</div>
         <div class="value num">${fmtInt(sCur.total + sPrev.total)}</div>
         <div class="prev num muted">across both files</div>
       </div>`;
@@ -825,7 +825,7 @@ window.renderDashboard = function renderDashboard(){
       ['#3  Unique active vehicles',      d=>d.unique_active_vehicles,   fmtInt, 'higher'],
       ['#4  Fleet utilisation %',         d=>d.fleet_utilisation_pct,    fmtPctV, 'higher'],
       ['#5  Jobs per online hour',        d=>d.jobs_per_online_hour,     fmt2,   'higher'],
-      ['#6  No-supply cancels',           d=>d.no_supply_cancels,        fmtInt, 'lower'],
+      ['#6  Cancelled rides (all)',       d=>d.cancelled_jobs,            fmtInt, 'lower'],
       ['#7  Avg time to pickup (ASAP)',   d=>d.avg_time_to_pickup_min,   fmtMin, 'lower'],
       ['#8  Fulfilment rate',             d=>d.fulfilment_rate_pct,      fmtPctV, 'higher'],
       ['#9  Request→paid conversion',     d=>d.request_to_paid_pct,      fmtPctV, 'higher'],
