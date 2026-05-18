@@ -20,6 +20,7 @@ hours  = json.loads((ROOT / "hours.json").read_text(encoding="utf-8"))
 reg    = json.loads((ROOT / "registrations.json").read_text(encoding="utf-8"))
 otp    = json.loads((ROOT / "otp.json").read_text(encoding="utf-8"))
 top    = json.loads((ROOT / "top_clients.json").read_text(encoding="utf-8"))
+kpis_d = json.loads((ROOT / "kpis.json").read_text(encoding="utf-8"))
 template = (ROOT / "dashboard.template.html").read_text(encoding="utf-8")
 
 if PUBLIC_MODE:
@@ -44,6 +45,7 @@ hours_inline  = f"<script>window.__HOURS__ = {json.dumps(hours, ensure_ascii=Fal
 reg_inline    = f"<script>window.__REG__ = {json.dumps(reg, ensure_ascii=False)};</script>"
 otp_inline    = f"<script>window.__OTP__ = {json.dumps(otp, ensure_ascii=False)};</script>"
 top_inline    = f"<script>window.__TOPCLIENTS__ = {json.dumps(top, ensure_ascii=False)};</script>"
+kpis_inline   = f"<script>window.__KPIS__ = {json.dumps(kpis_d, ensure_ascii=False)};</script>"
 
 out = template.replace("<!--DATA_PLACEHOLDER-->", income_inline)
 out = out.replace("<!--JOBS_PLACEHOLDER-->", jobs_inline)
@@ -51,6 +53,7 @@ out = out.replace("<!--HOURS_PLACEHOLDER-->", hours_inline)
 out = out.replace("<!--REG_PLACEHOLDER-->", reg_inline)
 out = out.replace("<!--OTP_PLACEHOLDER-->", otp_inline)
 out = out.replace("<!--TOPCLIENTS_PLACEHOLDER-->", top_inline)
+out = out.replace("<!--KPIS_PLACEHOLDER-->", kpis_inline)
 
 if PUBLIC_MODE:
     # Add a small banner so it's obvious which build is being viewed

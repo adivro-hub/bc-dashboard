@@ -23,6 +23,17 @@
   .legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
   .grid{display:grid;gap:16px}
   .kpis{grid-template-columns:repeat(auto-fit, minmax(190px, 1fr))}
+  /* Tab bar */
+  .tabs{display:flex;gap:4px;margin:18px 0 22px;border-bottom:1px solid var(--line)}
+  .tabs button{
+    background:transparent;color:var(--muted);border:0;border-bottom:2px solid transparent;
+    padding:10px 16px;font:600 13px system-ui;letter-spacing:.3px;cursor:pointer;
+    text-transform:uppercase;
+  }
+  .tabs button:hover{color:var(--text)}
+  .tabs button.active{color:var(--text);border-bottom-color:var(--accent)}
+  .view{display:none}
+  .view.active{display:block}
   .panels{grid-template-columns:1fr 1fr}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
   .kpi .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
@@ -89,6 +100,13 @@
       <span><span class="dot" style="background:var(--prev)"></span>Previous week</span>
     </div>
   </header>
+
+  <div class="tabs" id="tabs">
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="ops">Operational KPIs</button>
+  </div>
+
+  <div class="view active" data-view="overview">
 
   <h2>Headline KPIs</h2>
   <div class="grid kpis" id="kpiGrid"></div>
@@ -294,7 +312,32 @@
   </div>
 
   <p class="sub" style="margin-top:24px">Source files: Income Structure and Job Analogue exports for the two periods shown above.</p>
-</div>
+
+  </div><!-- /view-overview -->
+
+  <div class="view" data-view="ops">
+    <h2>Operational KPIs</h2>
+    <p class="sub" style="margin-top:-8px;margin-bottom:18px">
+      Current week vs previous week. KPI numbering matches the spec sheet.
+      <strong>#3 (Active cars %)</strong> needs a registered-fleet roster we don't have yet —
+      replaced with "Unique active vehicles". <strong>#6</strong> only counts
+      <em>explicit</em> no-supply cancel reasons; ~92% of cancellations have no documented
+      reason. <strong>#10</strong> shows <em>gross</em> commission
+      (Σ Total − Σ Driver) — bonuses/adjustments aren't in the data, so the net figure on
+      Income Structure runs ~15% lower.
+    </p>
+    <div class="grid kpis" id="opsKpis"></div>
+    <p class="sub" style="margin-top:18px">
+      Definitions: <strong>Login h / car / day</strong> = total login hours ÷ unique vehicles
+      with at least one DONE job ÷ 7 days. <strong>Fleet utilisation</strong> = busy ÷ online
+      (already shown on Overview). <strong>Time to pickup</strong> uses the
+      <em>Response Time</em> column on ASAP DONE jobs only.
+      <strong>Fulfilment rate</strong> = DONE ÷ (DONE + CANCELLED).
+      <strong>Monthly run-rate</strong> = weekly commission × 4.345.
+    </p>
+  </div><!-- /view-ops -->
+
+</div><!-- /.wrap -->
 
 <!--DATA_PLACEHOLDER-->
 <!--JOBS_PLACEHOLDER-->
@@ -302,9 +345,19 @@
 <!--REG_PLACEHOLDER-->
 <!--OTP_PLACEHOLDER-->
 <!--TOPCLIENTS_PLACEHOLDER-->
+<!--KPIS_PLACEHOLDER-->
 
 <script>
 (function(){
+  // ---------- TAB SWITCHING ----------
+  document.getElementById('tabs').addEventListener('click', e=>{
+    if (e.target.tagName !== 'BUTTON') return;
+    const target = e.target.dataset.tab;
+    document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===target));
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.dataset.view===target));
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+
   const D = window.__DATA__;
   const cur = D.current, prev = D.previous;
   const fmtMoney = v => (v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1145,6 +1198,53 @@
   }
 
   recompute();
+
+  // ============================================================
+  // OPERATIONAL KPIs (second tab)
+  // ============================================================
+  const K = window.__KPIS__;
+  if (K){
+    const kCur = K.current, kPrev = K.previous;
+    const opsGrid = document.getElementById('opsKpis');
+
+    function fmt1(v){ return (v||0).toFixed(1); }
+    function fmt2(v){ return (v||0).toFixed(2); }
+    function fmtPctV(v){ return fmt1(v) + '%'; }
+    function fmtMin(v){ return fmt1(v) + ' min'; }
+
+    // Each: [label, getter, formatter, deltaSemantics]
+    //   deltaSemantics: 'higher' (green when up) or 'lower' (green when down)
+    const defs = [
+      ['#1  Total login hours',           d=>d.total_login_hours,        fmtInt, 'higher'],
+      ['#2  Login h / car / day',         d=>d.login_h_per_car_per_day,  fmt2,   'higher'],
+      ['#3  Unique active vehicles',      d=>d.unique_active_vehicles,   fmtInt, 'higher'],
+      ['#4  Fleet utilisation %',         d=>d.fleet_utilisation_pct,    fmtPctV, 'higher'],
+      ['#5  Jobs per online hour',        d=>d.jobs_per_online_hour,     fmt2,   'higher'],
+      ['#6  No-supply cancels',           d=>d.no_supply_cancels,        fmtInt, 'lower'],
+      ['#7  Avg time to pickup (ASAP)',   d=>d.avg_time_to_pickup_min,   fmtMin, 'lower'],
+      ['#8  Fulfilment rate',             d=>d.fulfilment_rate_pct,      fmtPctV, 'higher'],
+      ['#9  Request→paid conversion',     d=>d.request_to_paid_pct,      fmtPctV, 'higher'],
+      ['#10 Gross commission (RON)',      d=>d.gross_commission,         fmtMoney, 'higher'],
+      ['#10 Monthly run-rate (RON)',      d=>d.monthly_run_rate,         fmtMoney, 'higher'],
+    ];
+
+    defs.forEach(([label, get, fmt, semantics])=>{
+      const c = get(kCur), p = get(kPrev);
+      const delta = p? ((c-p)/p)*100 : 0;
+      let cls;
+      if (Math.abs(delta) < 0.05) cls = 'flat';
+      else if (semantics === 'lower') cls = delta <= 0 ? 'up' : 'down';
+      else                            cls = delta >= 0 ? 'up' : 'down';
+      const arrow = cls==='up'?'▲':cls==='down'?'▼':'■';
+      opsGrid.insertAdjacentHTML('beforeend', `
+        <div class="card kpi">
+          <div class="label">${label}</div>
+          <div class="value num">${fmt(c)}</div>
+          <div class="prev num">prev ${fmt(p)}</div>
+          <span class="delta ${cls}">${arrow} ${fmtPct(delta)}</span>
+        </div>`);
+    });
+  }
 })();
 </script>
 </body>
