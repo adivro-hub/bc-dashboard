@@ -3,10 +3,21 @@
     <h1>BC Dashboard — Bring your own reports</h1>
     <div class="sub">
       Drop your Excel exports — any number of files, any week. They are parsed
-      in your browser and never leave your machine. Pick any two periods to
-      compare (a day, a week, a month — anything).
+      in your browser. Pick any two periods to compare (a day, a week, a
+      month — anything). If a shared store is configured, signed-in
+      uploaders can push the anonymised data so colleagues see it without
+      re-uploading.
     </div>
   </header>
+
+  <div id="authBar">
+    <span id="authStatus">Local-only mode.</span>
+    <input type="email" id="authEmail" placeholder="your@email.com" style="display:none" />
+    <button id="authSignIn" style="display:none">Send magic link</button>
+    <button id="authSignOut" class="secondary" style="display:none">Sign out</button>
+    <button id="loadFromStore" class="secondary" style="display:none">Load shared data</button>
+    <span id="authHint" class="mode-hint"></span>
+  </div>
 
   <label class="drop drop-all" id="drop-all">
     <h3>Drop all your reports here</h3>
@@ -60,6 +71,7 @@
 
     <div class="actions">
       <button id="generate" disabled>Generate dashboard</button>
+      <button id="pushToStore" class="secondary" style="display:none">Push to shared store</button>
       <button class="secondary" id="reset">Reset all</button>
       <span id="status"></span>
     </div>

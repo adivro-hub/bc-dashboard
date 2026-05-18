@@ -126,3 +126,24 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 #files-list div{padding:2px 0}
 #files-list .kind{display:inline-block;width:110px;color:var(--accent);font-weight:600}
 #files-list .range{color:var(--muted)}
+
+/* ---- Auth bar ---- */
+#authBar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:8px 12px;margin-bottom:14px;font-size:12px;color:var(--muted);
+}
+#authBar.signed-in{border-color:var(--good)}
+#authBar .who{color:var(--text);font-weight:600}
+#authBar .role{color:var(--accent);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+#authBar input[type=email]{
+  background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:5px 8px;font-family:inherit;font-size:12px;width:240px;
+}
+#authBar button{
+  background:var(--accent);color:#0b1020;border:0;border-radius:6px;
+  padding:5px 12px;font:600 11px system-ui;cursor:pointer;
+}
+#authBar button.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
+#authBar button:hover{filter:brightness(1.1)}
+#authBar .mode-hint{margin-left:auto;font-size:11px}

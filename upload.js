@@ -24,6 +24,7 @@
     raw_files:    [],   // [{name, kind}] for the visible file list
     coverage:     { from: null, to: null },
     _fileHashes:  new Set(),   // SHA-256 of bytes — skip duplicate uploads
+    job_file_bundles: [],      // [{name, bytes, rows}] for the push-to-store flow
   };
 
   const dropAll  = document.getElementById('drop-all');
@@ -42,6 +43,193 @@
   });
   document.getElementById('reset').addEventListener('click', () => location.reload());
   document.getElementById('generate').addEventListener('click', () => generate());
+
+  // ---------------------------------------------------------------
+  // Auth + shared-store wiring (no-op when Supabase isn't configured)
+  // ---------------------------------------------------------------
+  initAuth();
+  document.getElementById('authSignIn')?.addEventListener('click', signIn);
+  document.getElementById('authSignOut')?.addEventListener('click', async () => { await window.BCStore.signOut(); location.reload(); });
+  document.getElementById('pushToStore')?.addEventListener('click', () => pushAllToStore());
+  document.getElementById('loadFromStore')?.addEventListener('click', () => loadFromStore());
+
+  async function initAuth(){
+    const bar = document.getElementById('authBar');
+    const statusEl = document.getElementById('authStatus');
+    if (!window.BCStore || !window.BCStore.enabled){
+      statusEl.textContent = 'Local-only mode (no shared store configured).';
+      return;
+    }
+    const role = await window.BCStore.getRole();
+    const email = await window.BCStore.getEmail();
+    if (!email){
+      statusEl.textContent = 'Sign in to push or load shared data:';
+      document.getElementById('authEmail').style.display = '';
+      document.getElementById('authSignIn').style.display = '';
+      return;
+    }
+    if (!role){
+      statusEl.innerHTML = `Signed in as <span class="who">${escapeHtml(email)}</span> — but you're not in the members table. Ask an admin to add you.`;
+      document.getElementById('authSignOut').style.display = '';
+      return;
+    }
+    bar.classList.add('signed-in');
+    statusEl.innerHTML = `Signed in as <span class="who">${escapeHtml(email)}</span> <span class="role">${role}</span>`;
+    document.getElementById('authSignOut').style.display = '';
+    document.getElementById('loadFromStore').style.display = '';
+    if (role === 'uploader'){
+      document.getElementById('pushToStore').style.display = '';
+    }
+  }
+  async function signIn(){
+    const email = document.getElementById('authEmail').value.trim();
+    if (!email) return setStatus('Enter your email first.', 'error');
+    try {
+      await window.BCStore.signInWithEmail(email);
+      document.getElementById('authStatus').textContent = `Check ${email} — sent a magic link.`;
+    } catch (err){
+      setStatus('Sign in failed: ' + err.message, 'error');
+    }
+  }
+
+  async function pushAllToStore(){
+    if (!window.BCStore?.enabled) return;
+    setStatus('Pushing to shared store…');
+    let pushed = 0, skipped = 0;
+    try {
+      // Income
+      for (const f of STORE.income_files){
+        const bytes = f._bytes;
+        const res = await window.BCStore.pushIncome(f, bytes, f.source_name);
+        if (res?.error) throw res.error;
+        pushed++;
+      }
+      // Hours
+      for (const f of STORE.hours_files){
+        const bytes = f._bytes;
+        const res = await window.BCStore.pushHours(f, bytes, f.source_name);
+        if (res?.error) throw res.error;
+        pushed++;
+      }
+      // Jobs — grouped by source file (we have STORE._jobsByFile)
+      for (const jf of (STORE.job_file_bundles || [])){
+        const res = await window.BCStore.pushJobs(jf.rows, jf.bytes, jf.name);
+        if (res?.skipped) { skipped++; }
+        else { pushed++; }
+      }
+      // Registrations
+      for (const f of STORE.reg_files){
+        const bytes = f._bytes;
+        const res = await window.BCStore.pushRegistrations(f, bytes, f.name);
+        if (res?.skipped) { skipped++; }
+        else { pushed++; }
+      }
+      // Account names map — extracted from current top corp rows if available
+      if (window.__TOPCLIENTS__?.corporate?.top){
+        const nameMap = {};
+        for (const r of window.__TOPCLIENTS__.corporate.top){
+          if (r.account_no && r.account_name) nameMap[r.account_no] = r.account_name;
+        }
+        await window.BCStore.pushAccountNames(nameMap);
+      }
+      setStatus(`Pushed ${pushed} files (${skipped} already in store).`, 'ok');
+    } catch (err){
+      console.error(err);
+      setStatus('Push failed: ' + (err.message || err), 'error');
+    }
+  }
+
+  async function loadFromStore(){
+    if (!window.BCStore?.enabled) return;
+    setStatus('Loading from shared store…');
+    try {
+      const blob = await window.BCStore.loadAll();
+      // Replace the in-memory STORE with what came from the server.
+      STORE.income_files = blob.income_files.map(f => ({
+        source_name: f.source_name, period_from: f.period_from, period_to: f.period_to,
+        sections: f.sections, kpis: f.kpis,
+      }));
+      STORE.hours_files = blob.hours_files.map(f => ({
+        source_name: f.source_name, period: f.period,
+        timestamps: f.timestamps, hourly: f.hourly,
+        by_hour_of_day: deriveByHourOfDay(f.timestamps, f.hourly),
+        derived: deriveHoursDerived(f.timestamps, f.hourly),
+      }));
+      // Job rows: server gave us anonymised rows. Rehydrate to the shape the
+      // dashboard expects.
+      STORE.job_rows = blob.job_rows.map(r => ({
+        account_no:   r.account_no != null ? String(r.account_no) : '',
+        account_name: blob.account_names[r.account_no] || '',
+        job_no:       '',
+        urgency:      r.urgency || '',
+        status:       r.status  || '',
+        service:      r.service || '',
+        date:         r.date,
+        hour:         r.hour,
+        pickup:       r.is_otp_pickup  ? 'OTP/LROP' : '',
+        dropoff:      r.is_otp_dropoff ? 'OTP/LROP' : '',
+        vehicle:      r.vehicle_hash || '',
+        cancel_reason:r.is_no_supply_cancel ? 'no cars available' : '',
+        response_min: r.response_min,
+        phone:        r.phone_hash || '',
+        total:        Number(r.total) || 0,
+        driver_total: Number(r.driver_total) || 0,
+      }));
+      STORE.reg_files = blob.reg_files.map(f => ({ name: f.source_name, rows: [], min: null, max: null }));
+      // We don't store registrations daily server-side as a table; rebuild from reg_rows:
+      const regByFile = {};
+      for (const r of blob.reg_rows){
+        if (!regByFile[r.file_id]) regByFile[r.file_id] = [];
+        regByFile[r.file_id].push(r);
+      }
+      STORE.reg_files = blob.reg_files.map(f => {
+        const rows = (regByFile[f.id] || []).map(r => ({
+          email: r.email_hash || '', created: new Date(r.created_at), status: r.status || '', src: f.source_name,
+        }));
+        const ds = rows.map(r => r.created).sort((a,b)=>a-b);
+        return { name: f.source_name, rows, min: ds[0] || null, max: ds[ds.length-1] || null };
+      });
+      STORE.raw_files = [
+        ...STORE.income_files.map(f => ({name: f.source_name, kind: 'income (shared)'})),
+        ...STORE.hours_files.map(f => ({name: f.source_name, kind: 'hours (shared)'})),
+        ...(blob.job_files || []).map(f => ({name: f.source_name, kind: 'jobs (shared)'})),
+        ...STORE.reg_files.map(f => ({name: f.name, kind: 'registrations (shared)'})),
+      ];
+      recomputeCoverage();
+      refreshSummary();
+      suggestDefaultPeriods();
+      setStatus(`Loaded shared store (${STORE.job_rows.length.toLocaleString()} job rows). Pick periods.`, 'ok');
+    } catch (err){
+      console.error(err);
+      setStatus('Load failed: ' + (err.message || err), 'error');
+    }
+  }
+
+  function deriveByHourOfDay(timestamps, hourly){
+    const keys = Object.keys(hourly);
+    const out = {}; for (const k of keys) out[k] = new Array(24).fill(0);
+    const counts = new Array(24).fill(0);
+    for (let i = 0; i < timestamps.length; i++){
+      const h = new Date(timestamps[i]).getHours();
+      counts[h]++;
+      for (const k of keys) out[k][h] += hourly[k][i] || 0;
+    }
+    for (const k of keys) out[k] = out[k].map((v,h) => counts[h] ? v/counts[h] : 0);
+    return out;
+  }
+  function deriveHoursDerived(timestamps, hourly){
+    const onlineTotal = (hourly.online    || []).reduce((s,v)=>s+v,0);
+    const onBreakTotal= (hourly.on_break  || []).reduce((s,v)=>s+v,0);
+    const busyTotal   = (hourly.doing_job || []).reduce((s,v)=>s+v,0);
+    const avail = onlineTotal - onBreakTotal;
+    return {
+      available_total: avail, busy_total: busyTotal,
+      online_total: onlineTotal, on_break_total: onBreakTotal,
+      util_avg: avail ? busyTotal/avail : 0,
+      peak_available: Math.max(...(hourly.online || []).map((o,i)=>o - (hourly.on_break||[])[i] || 0)),
+      peak_busy: Math.max(...(hourly.doing_job || [0])),
+    };
+  }
 
   // Preset buttons
   document.querySelectorAll('.period-presets button').forEach(btn => {
@@ -63,15 +251,23 @@
         const wb = XLSX.read(buf, { type: 'array', cellDates: true });
         const kind = BCParsers.detectFileType(wb);
         const file = { name: f.name, workbook: wb };
+        const bytes = new Uint8Array(buf);
         if (kind === 'income'){
-          STORE.income_files.push(BCParsers.parseIncomePerFile(file));
+          const parsed = BCParsers.parseIncomePerFile(file);
+          parsed._bytes = bytes;
+          STORE.income_files.push(parsed);
         } else if (kind === 'hours'){
-          STORE.hours_files.push(BCParsers.parseHoursPerFile(file));
+          const parsed = BCParsers.parseHoursPerFile(file);
+          parsed._bytes = bytes;
+          STORE.hours_files.push(parsed);
         } else if (kind === 'jobs'){
           const rows = BCParsers.parseJobAnalogue(wb);
           for (const r of rows) STORE.job_rows.push(r);
+          STORE.job_file_bundles.push({ name: f.name, bytes, rows });
         } else if (kind === 'registrations'){
-          STORE.reg_files.push(BCParsers.parseRegistrationsPerFile(file));
+          const parsed = BCParsers.parseRegistrationsPerFile(file);
+          parsed._bytes = bytes;
+          STORE.reg_files.push(parsed);
         } else {
           STORE.raw_files.push({ name: f.name, kind: 'unknown' });
           continue;

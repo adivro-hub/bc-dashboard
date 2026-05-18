@@ -38,10 +38,13 @@ if UPLOAD_MODE:
     # Inject the upload UI immediately inside <body>.
     upload_ui = (ROOT / "upload_ui.html").read_text(encoding="utf-8")
     out = out.replace("<body>", "<body>" + upload_ui)
-    # Pull in SheetJS, parsers.js, upload.js.
+    # Pull in SheetJS, Supabase (optional), config (optional), parsers, store, upload.
     head_extra = (
         '<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>\n'
+        '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
+        '<script src="config.js" onerror="this.remove()"></script>\n'
         '<script src="parsers.js" defer></script>\n'
+        '<script src="shared_store.js" defer></script>\n'
         '<script src="upload.js" defer></script>\n'
     )
     out = out.replace("</head>", head_extra + "</head>")

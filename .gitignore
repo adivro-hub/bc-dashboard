@@ -24,6 +24,10 @@ peek_*.py
 find_*.py
 otp_by_service.py
 otp_*.csv
+
+# Local Supabase config (URL + anon key) — each deployment has its own
+config.js
+new reports/
 __pycache__/
 *.pyc
 .vscode/
