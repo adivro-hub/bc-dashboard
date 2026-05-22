@@ -353,24 +353,7 @@
     };
   }
 
-  // Preset dropdowns: keep the chosen option visible after applying.
-  // If the user then edits the date inputs by hand, clear the dropdown so it
-  // doesn't lie about what range is currently set.
-  function wirePreset(selectId, target, apply, fromId, toId){
-    const sel = document.getElementById(selectId);
-    if (!sel) return;
-    sel.addEventListener('change', e => {
-      if (e.target.value) apply(e.target.value, target);
-    });
-    [fromId, toId].forEach(id => {
-      const inp = document.getElementById(id);
-      inp?.addEventListener('input', () => { sel.value = ''; });
-    });
-  }
-  wirePreset('curPreset',         'cur',  applyPreset,        'curFrom',        'curTo');
-  wirePreset('prevPreset',        'prev', applyPreset,        'prevFrom',       'prevTo');
-  wirePreset('overlayCurPreset',  'cur',  applyOverlayPreset, 'overlayCurFrom', 'overlayCurTo');
-  wirePreset('overlayPrevPreset', 'prev', applyOverlayPreset, 'overlayPrevFrom','overlayPrevTo');
+  // Presets removed — date inputs only.
   document.getElementById('overlayGenerate')?.addEventListener('click', () => {
     // Copy overlay inputs back to sticky-bar inputs, then generate + dismiss.
     ['curFrom','curTo','prevFrom','prevTo'].forEach(id => {

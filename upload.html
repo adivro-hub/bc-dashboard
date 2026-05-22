@@ -50,24 +50,11 @@
           <div class="picker-modal-label">CURRENT</div>
           <label>From <input type="date" id="overlayCurFrom" /></label>
           <label>To &nbsp;&nbsp;<input type="date" id="overlayCurTo" /></label>
-          <select id="overlayCurPreset">
-            <option value="">Quick presets…</option>
-            <option value="last7">Last 7 days</option>
-            <option value="last30">Last 30 days</option>
-            <option value="lastWeek">Most recent full week</option>
-            <option value="lastMonth">Most recent full month</option>
-          </select>
         </div>
         <div class="picker-modal-card">
           <div class="picker-modal-label prev">PREVIOUS</div>
           <label>From <input type="date" id="overlayPrevFrom" /></label>
           <label>To &nbsp;&nbsp;<input type="date" id="overlayPrevTo" /></label>
-          <select id="overlayPrevPreset">
-            <option value="">Quick presets…</option>
-            <option value="priorEqual">Equal range right before current</option>
-            <option value="lastWeek-1">Week before current</option>
-            <option value="lastMonth-1">Month before current</option>
-          </select>
         </div>
       </div>
 
@@ -117,25 +104,12 @@
         <input type="date" id="curFrom" />
         <span class="picker-sep">→</span>
         <input type="date" id="curTo" />
-        <select id="curPreset" title="Quick presets">
-          <option value="">Quick…</option>
-          <option value="last7">Last 7 days</option>
-          <option value="last30">Last 30 days</option>
-          <option value="lastWeek">Most recent full week</option>
-          <option value="lastMonth">Most recent full month</option>
-        </select>
       </div>
       <div class="picker-group">
         <span class="picker-label prev">Previous</span>
         <input type="date" id="prevFrom" />
         <span class="picker-sep">→</span>
         <input type="date" id="prevTo" />
-        <select id="prevPreset" title="Quick presets">
-          <option value="">Quick…</option>
-          <option value="priorEqual">Equal range right before current</option>
-          <option value="lastWeek-1">Week before current</option>
-          <option value="lastMonth-1">Month before current</option>
-        </select>
       </div>
       <button id="generate" class="picker-go" disabled>View</button>
       <button id="pushToStore" class="secondary" style="display:none">Push to store</button>
