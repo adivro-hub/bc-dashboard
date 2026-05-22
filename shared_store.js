@@ -220,32 +220,80 @@ async function fetchAll(table, orderBy){
   return out;
 }
 
-async function loadAll(progress){
+// Fast metadata load: tiny tables only. No bulk row data.
+// Run this on sign-in; the dashboard chrome (coverage, defaults) appears
+// near-instantly.
+async function loadMetadata(progress){
   if (!ENABLED) throw new Error('Supabase not configured');
   const note = (msg) => { if (progress) progress(msg); };
-  note('Loading income files…');
-  const income     = await fetchAll('income_files', 'period_from');
-  note('Loading hours files…');
-  const hours      = await fetchAll('hours_files',  'period_start');
-  note('Loading job files…');
-  const jobsFiles  = await fetchAll('job_files',    'period_start');
-  note('Loading registration files…');
-  const regFiles   = await fetchAll('reg_files',    'uploaded_at');
-  note('Loading account names…');
-  const names      = await fetchAll('account_names','account_no');
-  note('Loading job rows (this is the big one)…');
-  const jobsRows   = await fetchAll('job_rows',     'date');
-  note('Loading registration rows…');
-  const regRows    = await fetchAll('reg_rows',     'created_at');
+  note('Loading metadata…');
+  const [income, hours, jobsFiles, regFiles, names] = await Promise.all([
+    fetchAll('income_files', 'period_from'),
+    fetchAll('hours_files',  'period_start'),
+    fetchAll('job_files',    'period_start'),
+    fetchAll('reg_files',    'uploaded_at'),
+    fetchAll('account_names','account_no'),
+  ]);
   return {
     income_files: income,
     hours_files:  hours,
     job_files:    jobsFiles,
-    job_rows:     jobsRows,
     reg_files:    regFiles,
-    reg_rows:     regRows,
     account_names: Object.fromEntries(names.map(r => [r.account_no, r.name])),
   };
+}
+
+// Fetch only the rows that fall inside a date range. Called per period
+// when the user clicks View.
+async function loadJobRowsForRange(from, to){
+  if (!ENABLED) throw new Error('Supabase not configured');
+  const PAGE = 1000;
+  let out = [], offset = 0;
+  while (true){
+    const { data, error } = await client.from('job_rows')
+      .select('*')
+      .gte('date', from).lte('date', to)
+      .order('date')
+      .range(offset, offset + PAGE - 1);
+    if (error) throw error;
+    if (!data || !data.length) break;
+    out = out.concat(data);
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
+  return out;
+}
+
+async function loadRegRowsForRange(from, to){
+  if (!ENABLED) throw new Error('Supabase not configured');
+  const PAGE = 1000;
+  // Reg rows use TIMESTAMPTZ — convert dates to ISO range
+  const fromIso = from + 'T00:00:00Z';
+  const toIso   = to   + 'T23:59:59Z';
+  let out = [], offset = 0;
+  while (true){
+    const { data, error } = await client.from('reg_rows')
+      .select('*')
+      .gte('created_at', fromIso).lte('created_at', toIso)
+      .order('created_at')
+      .range(offset, offset + PAGE - 1);
+    if (error) throw error;
+    if (!data || !data.length) break;
+    out = out.concat(data);
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
+  return out;
+}
+
+// Backwards-compat: full load (still works if anyone wants it)
+async function loadAll(progress){
+  const meta = await loadMetadata(progress);
+  if (progress) progress('Loading job rows (this is the big one)…');
+  const jobsRows = await fetchAll('job_rows', 'date');
+  if (progress) progress('Loading registration rows…');
+  const regRows  = await fetchAll('reg_rows', 'created_at');
+  return { ...meta, job_rows: jobsRows, reg_rows: regRows };
 }
 
 window.BCStore = {
@@ -259,7 +307,7 @@ window.BCStore = {
   // anonymise helpers (exposed so the upload page can show a preview)
   anonymiseJobRow, anonymiseRegRow,
   // reads
-  loadAll,
+  loadAll, loadMetadata, loadJobRowsForRange, loadRegRowsForRange,
 };
 
 })();

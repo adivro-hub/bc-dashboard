@@ -249,7 +249,10 @@
     try {
       // Only show technical per-table progress for uploaders.
       const onProgress = isUploader ? (msg => setStatus(msg)) : null;
-      const blob = await window.BCStore.loadAll(onProgress);
+      // Lazy load: fetch only metadata now; rows come on View click.
+      const blob = { ...(await window.BCStore.loadMetadata(onProgress)), job_rows: [], reg_rows: [] };
+      // Stash the account-name lookup so generate() can hydrate jobs later.
+      STORE._accountNames = blob.account_names || {};
       // Replace the in-memory STORE with what came from the server.
       STORE.income_files = blob.income_files.map(f => ({
         source_name: f.source_name, period_from: f.period_from, period_to: f.period_to,
@@ -281,20 +284,8 @@
         total:        Number(r.total) || 0,
         driver_total: Number(r.driver_total) || 0,
       }));
-      STORE.reg_files = blob.reg_files.map(f => ({ name: f.source_name, rows: [], min: null, max: null }));
-      // We don't store registrations daily server-side as a table; rebuild from reg_rows:
-      const regByFile = {};
-      for (const r of blob.reg_rows){
-        if (!regByFile[r.file_id]) regByFile[r.file_id] = [];
-        regByFile[r.file_id].push(r);
-      }
-      STORE.reg_files = blob.reg_files.map(f => {
-        const rows = (regByFile[f.id] || []).map(r => ({
-          email: r.email_hash || '', created: new Date(r.created_at), status: r.status || '', src: f.source_name,
-        }));
-        const ds = rows.map(r => r.created).sort((a,b)=>a-b);
-        return { name: f.source_name, rows, min: ds[0] || null, max: ds[ds.length-1] || null };
-      });
+      // Preserve id so we can attach rows on demand in generate().
+      STORE.reg_files = blob.reg_files.map(f => ({ id: f.id, name: f.source_name, rows: [], min: null, max: null }));
       STORE.raw_files = [
         ...STORE.income_files.map(f => ({name: f.source_name, kind: 'income (shared)'})),
         ...STORE.hours_files.map(f => ({name: f.source_name, kind: 'hours (shared)'})),
@@ -304,9 +295,7 @@
       recomputeCoverage();
       refreshSummary();
       suggestDefaultPeriods();
-      const msg = isUploader
-        ? `Loaded ${STORE.job_rows.length.toLocaleString()} job rows. Pick periods.`
-        : 'Ready — pick periods to compare.';
+      const msg = 'Ready — pick periods to compare.';
       setStatus(msg, 'ok');
     } catch (err){
       console.error(err);
@@ -574,19 +563,76 @@
   }
 
   // ---------- Generate dashboard ----------
-  function generate(){
+  async function generate(){
     const curFrom = document.getElementById('curFrom').value;
     const curTo   = document.getElementById('curTo').value;
     const prevFrom= document.getElementById('prevFrom').value;
     const prevTo  = document.getElementById('prevTo').value;
     if (!curFrom || !curTo){ setStatus('Pick a Current period.', 'error'); return; }
+
+    // Lazy fetch: pull only the rows in the selected ranges from Supabase.
+    // We aggregate the requested union once, then filter client-side per period.
+    if (window.BCStore?.enabled){
+      const rangeFrom = (prevFrom && prevFrom < curFrom) ? prevFrom : curFrom;
+      const rangeTo   = (prevTo   && prevTo   > curTo)   ? prevTo   : curTo;
+      // Cache: skip re-fetch if we already pulled this exact union range
+      const cacheKey  = `${rangeFrom}|${rangeTo}`;
+      if (STORE._lastRangeKey !== cacheKey){
+        setStatus('Fetching rows for the selected periods…');
+        try {
+          const [jobRows, regRows] = await Promise.all([
+            window.BCStore.loadJobRowsForRange(rangeFrom, rangeTo),
+            (STORE.reg_files.length ? window.BCStore.loadRegRowsForRange(rangeFrom, rangeTo) : Promise.resolve([])),
+          ]);
+          STORE.job_rows = jobRows.map(r => ({
+            account_no:   r.account_no != null ? String(r.account_no) : '',
+            account_name: STORE._accountNames?.[r.account_no] || '',
+            job_no:       '',
+            urgency:      r.urgency || '',
+            status:       r.status  || '',
+            service:      r.service || '',
+            date:         r.date,
+            hour:         r.hour,
+            pickup:       r.is_otp_pickup  ? 'OTP/LROP' : '',
+            dropoff:      r.is_otp_dropoff ? 'OTP/LROP' : '',
+            vehicle:      r.vehicle_hash || '',
+            cancel_reason:r.is_no_supply_cancel ? 'no cars available' : '',
+            response_min: r.response_min,
+            phone:        r.phone_hash || '',
+            total:        Number(r.total) || 0,
+            driver_total: Number(r.driver_total) || 0,
+          }));
+          // Rebuild reg_files rows arrays from the freshly-fetched reg_rows
+          if (STORE.reg_files.length){
+            const byFile = {};
+            for (const r of regRows){
+              if (!byFile[r.file_id]) byFile[r.file_id] = [];
+              byFile[r.file_id].push(r);
+            }
+            STORE.reg_files = STORE.reg_files.map(f => {
+              const rows = (byFile[f.id] || []).map(r => ({
+                email: r.email_hash || '', created: new Date(r.created_at),
+                status: r.status || '', src: f.name,
+              }));
+              const ds = rows.map(r => r.created).sort((a,b)=>a-b);
+              return { ...f, rows, min: ds[0] || null, max: ds[ds.length-1] || null };
+            });
+          }
+          STORE._lastRangeKey = cacheKey;
+        } catch (err){
+          console.error(err);
+          setStatus('Could not fetch rows: ' + (err.message || err), 'error');
+          return;
+        }
+      }
+    }
+
     setStatus('Aggregating…');
 
     function buildPeriod(from, to){
       const income = BCParsers.aggregateIncome(STORE.income_files, from, to);
       const hours  = BCParsers.aggregateHours(STORE.hours_files,   from, to);
       const jobs   = BCParsers.aggregateJobs(STORE.job_rows,        from, to);
-      // Synthesise income if missing (so the dashboard can still render)
       const finalIncome = income || synthesiseIncomeFromJobs(jobs, from, to);
       const { otp, kpis } = BCParsers.buildPeriodPayloads(finalIncome, hours, jobs);
       return { income: finalIncome, hours, jobs, otp, kpis };
