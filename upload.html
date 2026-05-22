@@ -27,7 +27,7 @@
     <input type="email" id="authEmail" placeholder="your@email.com" style="display:none" />
     <button id="authSignIn" style="display:none">Send magic link</button>
     <button id="authSignOut" class="secondary" style="display:none">Sign out</button>
-    <button id="loadFromStore" class="secondary" style="display:none">Refresh from server</button>
+    <button id="loadFromStore" class="secondary" style="display:none">Refresh data</button>
     <span id="authHint" class="mode-hint"></span>
   </div>
 
@@ -39,17 +39,19 @@
   </label>
 
   <div id="files-summary" style="display:none">
-    <h2 style="margin-top:24px">Files loaded</h2>
-    <div class="summary-strip" id="files-strip"></div>
-    <div class="card" style="margin-top:12px">
+    <h2 style="margin-top:24px" class="admin-only">Files loaded</h2>
+    <div class="summary-strip admin-only" id="files-strip"></div>
+    <div class="card admin-only" style="margin-top:12px">
       <div id="files-list" class="sub" style="font-size:12px;max-height:160px;overflow-y:auto"></div>
     </div>
 
-    <h2 style="margin-top:24px">Pick the two periods to compare</h2>
+    <div id="coverageNote" class="sub" style="margin:18px 0 -4px 0"></div>
+
+    <h2 style="margin-top:18px">Periods to compare</h2>
     <p class="sub" style="margin-top:-8px">
-      Defaults: <strong>Current</strong> = the most recent full week in your
-      data, <strong>Previous</strong> = the week before. Change either to
-      compare any custom range (day, week, month, anything).
+      Defaults: <strong>Current</strong> = most recent full week.
+      <strong>Previous</strong> = week before. Change either to compare any
+      custom range — day, week, month, anything.
     </p>
 
     <div class="period-pickers">
@@ -82,9 +84,9 @@
     </div>
 
     <div class="actions">
-      <button id="generate" disabled>Generate dashboard</button>
+      <button id="generate" disabled>View comparison</button>
       <button id="pushToStore" class="secondary" style="display:none">Push to shared store</button>
-      <button class="secondary" id="reset">Reset all</button>
+      <button class="secondary admin-only" id="reset">Reset all</button>
       <span id="status"></span>
     </div>
   </div>

@@ -85,12 +85,16 @@
     if (role === 'uploader'){
       document.getElementById('pushToStore').style.display = '';
       if (dropZone) dropZone.style.display = '';
-      if (intro) intro.innerHTML = 'Pick periods to compare and click Generate. Drop new reports below to push them to the shared store.';
+      if (intro) intro.innerHTML = 'Pick periods to compare and click View. Drop new reports below to push them to the shared store.';
+      document.body.classList.add('uploader-mode');
     } else {
-      if (intro) intro.textContent = 'Pick periods to compare and click Generate. Data refreshes automatically when an admin uploads new files.';
+      if (intro) intro.textContent = 'Pick periods to compare and click View.';
+      // Hide every admin-only element
+      document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+      document.body.classList.add('viewer-mode');
     }
     // Auto-load the latest snapshot from the shared store.
-    setStatus('Loading shared data…');
+    setStatus('Loading data…');
     await loadFromStore();
   }
   async function signIn(){
@@ -153,9 +157,12 @@
 
   async function loadFromStore(){
     if (!window.BCStore?.enabled) return;
-    setStatus('Loading from shared store…');
+    const isUploader = document.body.classList.contains('uploader-mode');
+    setStatus('Loading data…');
     try {
-      const blob = await window.BCStore.loadAll(msg => setStatus(msg));
+      // Only show technical per-table progress for uploaders.
+      const onProgress = isUploader ? (msg => setStatus(msg)) : null;
+      const blob = await window.BCStore.loadAll(onProgress);
       // Replace the in-memory STORE with what came from the server.
       STORE.income_files = blob.income_files.map(f => ({
         source_name: f.source_name, period_from: f.period_from, period_to: f.period_to,
@@ -210,10 +217,14 @@
       recomputeCoverage();
       refreshSummary();
       suggestDefaultPeriods();
-      setStatus(`Loaded shared store (${STORE.job_rows.length.toLocaleString()} job rows). Pick periods.`, 'ok');
+      const isUploader = document.body.classList.contains('uploader-mode');
+      const msg = isUploader
+        ? `Loaded ${STORE.job_rows.length.toLocaleString()} job rows. Pick periods.`
+        : 'Ready — pick periods to compare.';
+      setStatus(msg, 'ok');
     } catch (err){
       console.error(err);
-      setStatus('Load failed: ' + (err.message || err), 'error');
+      setStatus('Could not load data: ' + (err.message || err), 'error');
     }
   }
 
@@ -331,6 +342,16 @@
     ).join('') + (STORE.raw_files.some(f=>f.kind==='unknown')
         ? '<div class="range">Some files could not be classified — they were ignored.</div>'
         : '');
+
+    // Viewer-friendly coverage line (always shown; sits above the picker)
+    const cov = document.getElementById('coverageNote');
+    if (cov){
+      if (STORE.coverage.from && STORE.coverage.to){
+        cov.innerHTML = `<strong>Data available:</strong> ${STORE.coverage.from} → ${STORE.coverage.to}`;
+      } else {
+        cov.innerHTML = '';
+      }
+    }
 
     document.getElementById('generate').disabled = !STORE.coverage.from;
   }
