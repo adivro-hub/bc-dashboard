@@ -13,21 +13,31 @@
 <script src="shared_store.js" defer></script>
 <script src="upload.js" defer></script>
 </head>
-<body><div class="wrap" id="upload-wrap">
+<body><div id="authOverlay" class="overlay" style="display:none">
+  <div class="overlay-card">
+    <div class="overlay-brand">BC Operations Dashboard</div>
+    <h1 id="overlayTitle">Sign in to continue</h1>
+    <p class="overlay-sub" id="overlaySub">We'll email you a one-time sign-in link.</p>
+    <div class="overlay-form" id="overlayForm">
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
+      <button id="authSignIn">Send magic link</button>
+    </div>
+    <p class="overlay-msg" id="overlayMsg"></p>
+  </div>
+</div>
+
+<div class="wrap" id="upload-wrap">
   <header>
     <h1>BC Operations Dashboard</h1>
     <div class="sub" id="introText">
-      Sign in to load the latest data. Pick any two periods to compare
-      (day, week, month, anything).
+      Pick periods to compare and click View.
     </div>
   </header>
 
-  <div id="authBar">
-    <span id="authStatus">Local-only mode.</span>
-    <input type="email" id="authEmail" placeholder="your@email.com" style="display:none" />
-    <button id="authSignIn" style="display:none">Send magic link</button>
-    <button id="authSignOut" class="secondary" style="display:none">Sign out</button>
-    <button id="loadFromStore" class="secondary" style="display:none">Refresh data</button>
+  <div id="authBar" style="display:none">
+    <span id="authStatus"></span>
+    <button id="authSignOut" class="secondary">Sign out</button>
+    <button id="loadFromStore" class="secondary">Refresh data</button>
     <span id="authHint" class="mode-hint"></span>
   </div>
 

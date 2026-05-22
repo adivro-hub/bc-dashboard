@@ -152,7 +152,51 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 #files-list .kind{display:inline-block;width:110px;color:var(--accent);font-weight:600}
 #files-list .range{color:var(--muted)}
 
-/* ---- Auth bar ---- */
+/* ---- Auth overlay (pre-login) ---- */
+.overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:radial-gradient(circle at 30% 20%, rgba(124,156,255,.08), transparent 50%),
+              rgba(11,16,32,.92);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  display:grid;place-items:center;padding:24px;
+  animation:fadeIn .25s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.overlay-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:18px;
+  padding:36px 32px;max-width:440px;width:100%;
+  box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(124,156,255,.05);
+  text-align:center;
+}
+.overlay-brand{
+  font-size:11px;text-transform:uppercase;letter-spacing:1.5px;
+  color:var(--accent);margin-bottom:16px;
+}
+.overlay-card h1{
+  font-size:24px;font-weight:700;margin:0 0 8px 0;letter-spacing:.2px;
+}
+.overlay-sub{color:var(--muted);font-size:13px;margin:0 0 24px 0;line-height:1.5}
+.overlay-form{display:flex;gap:8px;flex-direction:column;margin-bottom:8px}
+.overlay-form input[type=email]{
+  background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+  border-radius:10px;padding:12px 14px;font-family:inherit;font-size:14px;
+  text-align:center;
+}
+.overlay-form input[type=email]:focus{outline:none;border-color:var(--accent)}
+.overlay-form button{
+  background:var(--accent);color:#0b1020;border:0;border-radius:10px;
+  padding:12px 18px;font:700 13px system-ui;cursor:pointer;letter-spacing:.3px;
+  transition:filter .15s;
+}
+.overlay-form button:hover:not(:disabled){filter:brightness(1.1)}
+.overlay-form button:disabled{opacity:.6;cursor:not-allowed}
+.overlay-msg{font-size:12px;color:var(--muted);margin:8px 0 0 0;min-height:18px}
+.overlay-msg.ok{color:var(--good)}
+.overlay-msg.error{color:var(--bad)}
+.overlay-card.sent .overlay-form{display:none}
+.overlay-card.sent .overlay-msg{font-size:14px;color:var(--text);margin-top:0}
+
+/* ---- Auth bar (post-login chip) ---- */
 #authBar{
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   background:var(--panel);border:1px solid var(--line);border-radius:10px;

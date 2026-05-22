@@ -49,6 +49,9 @@
   // ---------------------------------------------------------------
   initAuth();
   document.getElementById('authSignIn')?.addEventListener('click', signIn);
+  document.getElementById('authEmail')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter'){ e.preventDefault(); signIn(); }
+  });
   document.getElementById('authSignOut')?.addEventListener('click', async () => { await window.BCStore.signOut(); location.reload(); });
   document.getElementById('pushToStore')?.addEventListener('click', () => pushAllToStore());
   document.getElementById('loadFromStore')?.addEventListener('click', () => loadFromStore());
@@ -58,30 +61,58 @@
     const statusEl = document.getElementById('authStatus');
     const dropZone = document.getElementById('drop-all');
     const intro    = document.getElementById('introText');
+    const overlay  = document.getElementById('authOverlay');
+
+    function showOverlay(opts={}){
+      overlay.style.display = '';
+      const title = document.getElementById('overlayTitle');
+      const sub   = document.getElementById('overlaySub');
+      const msg   = document.getElementById('overlayMsg');
+      const card  = overlay.querySelector('.overlay-card');
+      card.classList.remove('sent');
+      if (opts.title) title.textContent = opts.title;
+      if (opts.sub)   sub.textContent   = opts.sub;
+      if (opts.msg)   { msg.textContent = opts.msg; msg.className = 'overlay-msg ' + (opts.msgClass||''); }
+      else            { msg.textContent = ''; msg.className = 'overlay-msg'; }
+    }
+    function hideOverlay(){ overlay.style.display = 'none'; }
 
     if (!window.BCStore || !window.BCStore.enabled){
-      statusEl.textContent = 'Local-only mode (no shared store configured).';
-      // In local mode, show the drop zone so the user can still pick files.
+      // Local-only mode (no Supabase): keep the legacy flow, no overlay.
       if (dropZone) dropZone.style.display = '';
+      bar.style.display = '';
+      statusEl.textContent = 'Local-only mode (no shared store configured).';
       return;
     }
-    const role = await window.BCStore.getRole();
+
+    const role  = await window.BCStore.getRole();
     const email = await window.BCStore.getEmail();
+
     if (!email){
-      statusEl.textContent = 'Sign in:';
-      document.getElementById('authEmail').style.display = '';
-      document.getElementById('authSignIn').style.display = '';
+      showOverlay({title:'Sign in to continue', sub:"We'll email you a one-time sign-in link."});
       return;
     }
     if (!role){
-      statusEl.innerHTML = `Signed in as <span class="who">${escapeHtml(email)}</span> — but you're not in the members table. Ask the admin to add you.`;
-      document.getElementById('authSignOut').style.display = '';
+      showOverlay({
+        title:'Access not authorised',
+        sub:`Signed in as ${email} — but this address isn't in the members list.`,
+        msg:'Ask the admin to add you, then refresh.',
+        msgClass:'error',
+      });
+      // Offer sign-out from inside the overlay so they can switch accounts
+      document.getElementById('overlayForm').innerHTML =
+        '<button id="overlaySignOut">Sign out</button>';
+      document.getElementById('overlaySignOut').addEventListener('click', async () => {
+        await window.BCStore.signOut(); location.reload();
+      });
       return;
     }
+
+    // Authenticated + role found: hide the overlay, show the dashboard chrome.
+    hideOverlay();
+    bar.style.display = '';
     bar.classList.add('signed-in');
     statusEl.innerHTML = `Signed in as <span class="who">${escapeHtml(email)}</span> <span class="role">${role}</span>`;
-    document.getElementById('authSignOut').style.display = '';
-    document.getElementById('loadFromStore').style.display = '';
     if (role === 'uploader'){
       document.getElementById('pushToStore').style.display = '';
       if (dropZone) dropZone.style.display = '';
@@ -89,22 +120,36 @@
       document.body.classList.add('uploader-mode');
     } else {
       if (intro) intro.textContent = 'Pick periods to compare and click View.';
-      // Hide every admin-only element
       document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
       document.body.classList.add('viewer-mode');
     }
-    // Auto-load the latest snapshot from the shared store.
     setStatus('Loading data…');
     await loadFromStore();
   }
   async function signIn(){
-    const email = document.getElementById('authEmail').value.trim();
-    if (!email) return setStatus('Enter your email first.', 'error');
+    const emailInput = document.getElementById('authEmail');
+    const msg = document.getElementById('overlayMsg');
+    const card = document.querySelector('#authOverlay .overlay-card');
+    const btn = document.getElementById('authSignIn');
+    const email = emailInput.value.trim();
+    if (!email){
+      msg.textContent = 'Enter your email first.';
+      msg.className = 'overlay-msg error';
+      return;
+    }
+    btn.disabled = true;
+    msg.textContent = 'Sending…';
+    msg.className = 'overlay-msg';
     try {
       await window.BCStore.signInWithEmail(email);
-      document.getElementById('authStatus').textContent = `Check ${email} — sent a magic link.`;
+      // Swap the form for a "check your email" state
+      card?.classList.add('sent');
+      msg.innerHTML = `Magic link sent to <strong>${escapeHtml(email)}</strong>.<br>Open your inbox and click the link to finish signing in.`;
+      msg.className = 'overlay-msg ok';
     } catch (err){
-      setStatus('Sign in failed: ' + err.message, 'error');
+      btn.disabled = false;
+      msg.textContent = 'Sign-in failed: ' + (err.message || err);
+      msg.className = 'overlay-msg error';
     }
   }
 
