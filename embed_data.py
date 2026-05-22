@@ -39,7 +39,12 @@ if UPLOAD_MODE:
     upload_ui = (ROOT / "upload_ui.html").read_text(encoding="utf-8")
     out = out.replace("<body>", "<body>" + upload_ui)
     # Pull in SheetJS, Supabase (optional), config (optional), parsers, store, upload.
+    # Theme bootstrap runs *before* CSS to avoid a flash of wrong theme.
     head_extra = (
+        '<script>'
+        '(function(){var t=localStorage.getItem("bc-theme")||"dark";'
+        'document.documentElement.setAttribute("data-theme",t);})();'
+        '</script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
         '<script src="config.js" onerror="this.remove()"></script>\n'

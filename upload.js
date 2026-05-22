@@ -52,6 +52,30 @@
   document.getElementById('authEmail')?.addEventListener('keydown', e => {
     if (e.key === 'Enter'){ e.preventDefault(); signIn(); }
   });
+
+  // ---- Theme toggle: persists in localStorage, reload to re-paint charts ----
+  function currentTheme(){ return document.documentElement.getAttribute('data-theme') || 'dark'; }
+  function syncThemeLabels(){
+    const label = currentTheme() === 'dark' ? '☀️ Light' : '🌙 Dark';
+    document.querySelectorAll('.theme-toggle').forEach(b => b.textContent = label);
+  }
+  syncThemeLabels();
+  document.querySelectorAll('.theme-toggle').forEach(b => {
+    b.addEventListener('click', () => {
+      const next = currentTheme() === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('bc-theme', next);
+      // Reload so Chart.js re-creates charts with the right text/grid colors.
+      location.reload();
+    });
+  });
+
+  // ---- Overlay sign-out (every state with an .overlay-signout button) ----
+  document.querySelectorAll('.overlay-signout').forEach(b => {
+    b.addEventListener('click', async () => {
+      await window.BCStore?.signOut?.();
+      location.reload();
+    });
+  });
   document.getElementById('authSignOut')?.addEventListener('click', async () => { await window.BCStore.signOut(); location.reload(); });
   document.getElementById('pushToStore')?.addEventListener('click', () => pushAllToStore());
   document.getElementById('loadFromStore')?.addEventListener('click', () => loadFromStore());

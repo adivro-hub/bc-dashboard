@@ -6,6 +6,19 @@
  * The function is idempotent-ish: it appends DOM, so call only once per build.
  */
 window.renderDashboard = function renderDashboard(){
+  // ---------- Theme-aware Chart.js colours ----------
+  const _cs = getComputedStyle(document.documentElement);
+  const TEXT_COLOR  = (_cs.getPropertyValue('--text')  || '#e6ecff').trim();
+  const MUTED_COLOR = (_cs.getPropertyValue('--muted') || '#9aa6cf').trim();
+  const PANEL_BG    = (_cs.getPropertyValue('--bg')    || '#0b1020').trim();
+  const GRID_COLOR  = MUTED_COLOR.startsWith('#') && MUTED_COLOR.length === 7
+    ? `rgba(${parseInt(MUTED_COLOR.slice(1,3),16)},${parseInt(MUTED_COLOR.slice(3,5),16)},${parseInt(MUTED_COLOR.slice(5,7),16)},.12)`
+    : 'rgba(154,166,207,.12)';
+  if (window.Chart && window.Chart.defaults){
+    window.Chart.defaults.color = TEXT_COLOR;
+    window.Chart.defaults.borderColor = GRID_COLOR;
+  }
+
   // ---------- TAB SWITCHING ----------
   const tabsEl = document.getElementById('tabs');
   if (tabsEl && !tabsEl._wired){
@@ -151,7 +164,7 @@ window.renderDashboard = function renderDashboard(){
     const values = entries.map(e=>e[1]);
     new Chart(document.getElementById(canvasId), {
       type:'doughnut',
-      data:{labels, datasets:[{data:values, backgroundColor:labels.map((_,i)=>COLOURS[i%COLOURS.length]), borderColor:'#0b1020', borderWidth:2}]},
+      data:{labels, datasets:[{data:values, backgroundColor:labels.map((_,i)=>COLOURS[i%COLOURS.length]), borderColor:PANEL_BG, borderWidth:2}]},
       options:{
         plugins:{
           legend:{position:'right', labels:{color:'#e6ecff', boxWidth:10, padding:8, font:{size:11}}},
