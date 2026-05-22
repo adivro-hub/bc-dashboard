@@ -78,7 +78,10 @@ if PUBLIC_MODE:
             row["account_name"] = ""
     for row in top.get("corporate", {}).get("top", []):
         row["account_name"] = ""
-    out_name = "index.html"
+    # The "public" build is now the offline demo (bundled anonymised data).
+    # It is no longer the root of the site — index.html is a redirect to the
+    # auth-gated live viewer (upload.html).
+    out_name = "demo.html"
 else:
     out_name = "dashboard.html"
 
