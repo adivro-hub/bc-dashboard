@@ -56,20 +56,25 @@
   async function initAuth(){
     const bar = document.getElementById('authBar');
     const statusEl = document.getElementById('authStatus');
+    const dropZone = document.getElementById('drop-all');
+    const intro    = document.getElementById('introText');
+
     if (!window.BCStore || !window.BCStore.enabled){
       statusEl.textContent = 'Local-only mode (no shared store configured).';
+      // In local mode, show the drop zone so the user can still pick files.
+      if (dropZone) dropZone.style.display = '';
       return;
     }
     const role = await window.BCStore.getRole();
     const email = await window.BCStore.getEmail();
     if (!email){
-      statusEl.textContent = 'Sign in to push or load shared data:';
+      statusEl.textContent = 'Sign in:';
       document.getElementById('authEmail').style.display = '';
       document.getElementById('authSignIn').style.display = '';
       return;
     }
     if (!role){
-      statusEl.innerHTML = `Signed in as <span class="who">${escapeHtml(email)}</span> — but you're not in the members table. Ask an admin to add you.`;
+      statusEl.innerHTML = `Signed in as <span class="who">${escapeHtml(email)}</span> — but you're not in the members table. Ask the admin to add you.`;
       document.getElementById('authSignOut').style.display = '';
       return;
     }
@@ -79,7 +84,14 @@
     document.getElementById('loadFromStore').style.display = '';
     if (role === 'uploader'){
       document.getElementById('pushToStore').style.display = '';
+      if (dropZone) dropZone.style.display = '';
+      if (intro) intro.innerHTML = 'Pick periods to compare and click Generate. Drop new reports below to push them to the shared store.';
+    } else {
+      if (intro) intro.textContent = 'Pick periods to compare and click Generate. Data refreshes automatically when an admin uploads new files.';
     }
+    // Auto-load the latest snapshot from the shared store.
+    setStatus('Loading shared data…');
+    await loadFromStore();
   }
   async function signIn(){
     const email = document.getElementById('authEmail').value.trim();

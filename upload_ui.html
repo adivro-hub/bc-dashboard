@@ -1,12 +1,9 @@
 <div class="wrap" id="upload-wrap">
   <header>
-    <h1>BC Dashboard — Bring your own reports</h1>
-    <div class="sub">
-      Drop your Excel exports — any number of files, any week. They are parsed
-      in your browser. Pick any two periods to compare (a day, a week, a
-      month — anything). If a shared store is configured, signed-in
-      uploaders can push the anonymised data so colleagues see it without
-      re-uploading.
+    <h1>BC Operations Dashboard</h1>
+    <div class="sub" id="introText">
+      Sign in to load the latest data. Pick any two periods to compare
+      (day, week, month, anything).
     </div>
   </header>
 
@@ -15,14 +12,14 @@
     <input type="email" id="authEmail" placeholder="your@email.com" style="display:none" />
     <button id="authSignIn" style="display:none">Send magic link</button>
     <button id="authSignOut" class="secondary" style="display:none">Sign out</button>
-    <button id="loadFromStore" class="secondary" style="display:none">Load shared data</button>
+    <button id="loadFromStore" class="secondary" style="display:none">Refresh from server</button>
     <span id="authHint" class="mode-hint"></span>
   </div>
 
-  <label class="drop drop-all" id="drop-all">
-    <h3>Drop all your reports here</h3>
+  <label class="drop drop-all" id="drop-all" style="display:none">
+    <h3>Admin — drop new reports here</h3>
     <p>Income Structure · Job Analogue · Hour Statistics · Registration Info</p>
-    <p class="sub">Files are classified by their content. Click or drop.</p>
+    <p class="sub">Files are classified by their content. Only visible to uploaders.</p>
     <input type="file" accept=".xls,.xlsx" multiple />
   </label>
 
