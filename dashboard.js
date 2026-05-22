@@ -8,8 +8,8 @@
 window.renderDashboard = function renderDashboard(){
   // ---------- Theme-aware Chart.js colours ----------
   const _cs = getComputedStyle(document.documentElement);
-  const TEXT_COLOR  = (_cs.getPropertyValue('--text')  || '#e6ecff').trim();
-  const MUTED_COLOR = (_cs.getPropertyValue('--muted') || '#9aa6cf').trim();
+  const TEXT_COLOR  = (_cs.getPropertyValue('--text')  || '#1a2138').trim();
+  const MUTED_COLOR = (_cs.getPropertyValue('--muted') || '#5d6788').trim();
   const PANEL_BG    = (_cs.getPropertyValue('--bg')    || '#0b1020').trim();
   const GRID_COLOR  = MUTED_COLOR.startsWith('#') && MUTED_COLOR.length === 7
     ? `rgba(${parseInt(MUTED_COLOR.slice(1,3),16)},${parseInt(MUTED_COLOR.slice(3,5),16)},${parseInt(MUTED_COLOR.slice(5,7),16)},.12)`
@@ -72,7 +72,7 @@ window.renderDashboard = function renderDashboard(){
   }
 
   // ---------- HELPERS ----------
-  const COLOURS = ['#7c9cff','#ffb86b','#3ddc97','#ff6b8a','#a78bfa','#5ee2ff','#ffd166','#f78fb3','#9aa6cf','#b4f8c8','#fbc4ab','#caffbf'];
+  const COLOURS = ['#7c9cff','#ffb86b','#3ddc97','#ff6b8a','#a78bfa','#5ee2ff','#ffd166','#f78fb3',MUTED_COLOR,'#b4f8c8','#fbc4ab','#caffbf'];
 
   function unionKeys(a, b, sortByCurTotal=true){
     const set = new Set([...Object.keys(a||{}), ...Object.keys(b||{})]);
@@ -131,7 +131,7 @@ window.renderDashboard = function renderDashboard(){
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{labels:{color:'#e6ecff'}},
+          legend:{labels:{color:TEXT_COLOR}},
           tooltip:{callbacks:{
             title:(items)=>{
               const i = items[0].dataIndex;
@@ -143,8 +143,8 @@ window.renderDashboard = function renderDashboard(){
           }}
         },
         scales:{
-          x:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}},
-          y:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}, beginAtZero:true}
+          x:{ticks:{color:MUTED_COLOR}, grid:{color:GRID_COLOR}},
+          y:{ticks:{color:MUTED_COLOR}, grid:{color:GRID_COLOR}, beginAtZero:true}
         }
       }
     });
@@ -167,7 +167,7 @@ window.renderDashboard = function renderDashboard(){
       data:{labels, datasets:[{data:values, backgroundColor:labels.map((_,i)=>COLOURS[i%COLOURS.length]), borderColor:PANEL_BG, borderWidth:2}]},
       options:{
         plugins:{
-          legend:{position:'right', labels:{color:'#e6ecff', boxWidth:10, padding:8, font:{size:11}}},
+          legend:{position:'right', labels:{color:TEXT_COLOR, boxWidth:10, padding:8, font:{size:11}}},
           tooltip:{callbacks:{label:(ctx)=>{
             const tot = values.reduce((s,v)=>s+v,0);
             const pct = tot? (ctx.raw/tot*100).toFixed(1):0;
@@ -201,7 +201,7 @@ window.renderDashboard = function renderDashboard(){
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{labels:{color:'#e6ecff'}},
+          legend:{labels:{color:TEXT_COLOR}},
           tooltip:{callbacks:{
             label:(ctx)=>`${ctx.dataset.label}: ${tableFmt(ctx.raw)}`,
             afterLabel:(ctx)=>{
@@ -212,8 +212,8 @@ window.renderDashboard = function renderDashboard(){
           }}
         },
         scales:{
-          x:{ticks:{color:'#9aa6cf', autoSkip:false, maxRotation:55, minRotation:35}, grid:{color:'rgba(154,166,207,.08)'}},
-          y:{ticks:{color:'#9aa6cf', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}, grid:{color:'rgba(154,166,207,.08)'}}
+          x:{ticks:{color:MUTED_COLOR, autoSkip:false, maxRotation:55, minRotation:35}, grid:{color:GRID_COLOR}},
+          y:{ticks:{color:MUTED_COLOR, callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}, grid:{color:GRID_COLOR}}
         }
       }
     });
@@ -336,15 +336,15 @@ window.renderDashboard = function renderDashboard(){
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{
-        legend:{labels:{color:'#e6ecff'}},
+        legend:{labels:{color:TEXT_COLOR}},
         tooltip:{callbacks:{label:(ctx)=>{
           const v = ctx.raw;
           return `${ctx.dataset.label}: ${v==null?'n/a':v.toFixed(2)+' h/job'}`;
         }}}
       },
       scales:{
-        x:{ticks:{color:'#9aa6cf', autoSkip:false, maxRotation:55, minRotation:35}, grid:{color:'rgba(154,166,207,.08)'}},
-        y:{ticks:{color:'#9aa6cf', callback:v=>v.toFixed(1)}, grid:{color:'rgba(154,166,207,.08)'}, title:{display:true,text:'Hours per job',color:'#9aa6cf'}}
+        x:{ticks:{color:MUTED_COLOR, autoSkip:false, maxRotation:55, minRotation:35}, grid:{color:GRID_COLOR}},
+        y:{ticks:{color:MUTED_COLOR, callback:v=>v.toFixed(1)}, grid:{color:GRID_COLOR}, title:{display:true,text:'Hours per job',color:MUTED_COLOR}}
       }
     }
   });
@@ -508,7 +508,7 @@ window.renderDashboard = function renderDashboard(){
         options:{
           responsive:true, maintainAspectRatio:false,
           plugins:{
-            legend:{labels:{color:'#e6ecff'}},
+            legend:{labels:{color:TEXT_COLOR}},
             tooltip:{callbacks:{
               label:(ctx)=>`${ctx.dataset.label}: ${fmtInt(ctx.raw)}`,
               afterLabel:(ctx)=>{
@@ -519,8 +519,8 @@ window.renderDashboard = function renderDashboard(){
             }}
           },
           scales:{
-            x:{ticks:{color:'#9aa6cf', autoSkip:false, maxRotation:35, minRotation:0}, grid:{color:'rgba(154,166,207,.08)'}},
-            y:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}, beginAtZero:true}
+            x:{ticks:{color:MUTED_COLOR, autoSkip:false, maxRotation:35, minRotation:0}, grid:{color:GRID_COLOR}},
+            y:{ticks:{color:MUTED_COLOR}, grid:{color:GRID_COLOR}, beginAtZero:true}
           }
         }
       });
@@ -618,12 +618,12 @@ window.renderDashboard = function renderDashboard(){
         responsive:true, maintainAspectRatio:false,
         interaction:{mode:'index', intersect:false},
         plugins:{
-          legend:{labels:{color:'#e6ecff'}},
+          legend:{labels:{color:TEXT_COLOR}},
           tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${ctx.raw.toFixed(1)}`}}
         },
         scales:{
-          x:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}},
-          y:{ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}, title:{display:true,text:'Vehicles (avg)',color:'#9aa6cf'}}
+          x:{ticks:{color:MUTED_COLOR}, grid:{color:GRID_COLOR}},
+          y:{ticks:{color:MUTED_COLOR}, grid:{color:GRID_COLOR}, title:{display:true,text:'Vehicles (avg)',color:MUTED_COLOR}}
         }
       }
     });
@@ -647,19 +647,19 @@ window.renderDashboard = function renderDashboard(){
             {label:'Busy (doing job)', data:busy, borderColor:'#3ddc97', backgroundColor:'rgba(61,220,151,.55)', fill:'origin', tension:.25, borderWidth:1.5, pointRadius:0, stack:'a'},
             {label:'Idle available',    data:idle, borderColor:'#7c9cff', backgroundColor:'rgba(124,156,255,.35)', fill:'-1',     tension:.25, borderWidth:1,   pointRadius:0, stack:'a'},
             {label:'On break',          data:onBreak, borderColor:'#ffb86b', backgroundColor:'rgba(255,184,107,.20)', fill:'-1', tension:.25, borderWidth:1,  pointRadius:0, stack:'a'},
-            {label:'Online (total)',    data:online, borderColor:'#e6ecff', backgroundColor:'transparent', fill:false, tension:.25, borderWidth:1.5, pointRadius:0, borderDash:[3,3]},
+            {label:'Online (total)',    data:online, borderColor:TEXT_COLOR, backgroundColor:'transparent', fill:false, tension:.25, borderWidth:1.5, pointRadius:0, borderDash:[3,3]},
           ]
         },
         options:{
           responsive:true, maintainAspectRatio:false,
           interaction:{mode:'index', intersect:false},
           plugins:{
-            legend:{labels:{color:'#e6ecff', boxWidth:12, font:{size:11}}},
+            legend:{labels:{color:TEXT_COLOR, boxWidth:12, font:{size:11}}},
             tooltip:{callbacks:{title:(items)=>items[0].label, label:(ctx)=>`${ctx.dataset.label}: ${Math.round(ctx.raw)}`}}
           },
           scales:{
-            x:{ticks:{color:'#9aa6cf', autoSkip:true, maxTicksLimit:14}, grid:{color:'rgba(154,166,207,.06)'}},
-            y:{stacked:false, ticks:{color:'#9aa6cf'}, grid:{color:'rgba(154,166,207,.08)'}, title:{display:true,text:'Vehicles',color:'#9aa6cf'}}
+            x:{ticks:{color:MUTED_COLOR, autoSkip:true, maxTicksLimit:14}, grid:{color:GRID_COLOR}},
+            y:{stacked:false, ticks:{color:MUTED_COLOR}, grid:{color:GRID_COLOR}, title:{display:true,text:'Vehicles',color:MUTED_COLOR}}
           }
         }
       });
