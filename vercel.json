@@ -3,13 +3,19 @@
   "cleanUrls": true,
   "headers": [
     {
-      "source": "/(.*\\.(css|js))",
+      "source": "/:path*.css",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=300, must-revalidate" }
       ]
     },
     {
-      "source": "/(.*\\.html)",
+      "source": "/:path*.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=300, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/:path*.html",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=60, must-revalidate" }
       ]
