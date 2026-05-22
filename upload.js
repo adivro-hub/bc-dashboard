@@ -254,9 +254,12 @@
     };
   }
 
-  // Preset buttons
-  document.querySelectorAll('.period-presets button').forEach(btn => {
-    btn.addEventListener('click', () => applyPreset(btn.dataset.preset, btn.dataset.target));
+  // Preset dropdowns (sticky picker)
+  document.getElementById('curPreset')?.addEventListener('change', e => {
+    if (e.target.value) { applyPreset(e.target.value, 'cur'); e.target.value = ''; }
+  });
+  document.getElementById('prevPreset')?.addEventListener('change', e => {
+    if (e.target.value) { applyPreset(e.target.value, 'prev'); e.target.value = ''; }
   });
 
   function setStatus(msg, cls=''){ statusEl.textContent = msg; statusEl.className = cls; }

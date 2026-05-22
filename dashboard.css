@@ -95,20 +95,45 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 .drop-all h3{font-size:16px}
 .drop-all p{font-size:13px}
 
-.period-pickers{display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:16px;margin-top:12px}
-.period-card .period-inputs{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
-.period-card .period-inputs label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
-.period-card .period-inputs input[type=date]{
+/* Sticky compact period picker bar */
+.picker-bar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(11,16,32,.92);backdrop-filter:blur(8px);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  margin:18px -28px 0;padding:12px 28px;
+  display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:13px;
+}
+.picker-bar .picker-group{display:flex;align-items:center;gap:6px}
+.picker-bar .picker-label{
+  font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--accent);min-width:54px;
+}
+.picker-bar .picker-label.prev{color:var(--prev)}
+.picker-bar .picker-sep{color:var(--muted);font-size:11px}
+.picker-bar input[type=date], .picker-bar select{
   background:var(--panel-2);color:var(--text);border:1px solid var(--line);
-  border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;
+  border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px;
   color-scheme:dark;
 }
-.period-card .period-presets{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.period-card .period-presets button{
-  background:var(--panel-2);color:var(--text);border:1px solid var(--line);
-  border-radius:6px;padding:4px 10px;font:600 11px system-ui;cursor:pointer;
+.picker-bar select{cursor:pointer;max-width:170px}
+.picker-bar .picker-go{
+  background:var(--accent);color:#0b1020;border:0;border-radius:6px;
+  padding:7px 16px;font:700 12px system-ui;cursor:pointer;letter-spacing:.3px;
 }
-.period-card .period-presets button:hover{background:var(--line)}
+.picker-bar .picker-go:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
+.picker-bar .picker-go:hover:not(:disabled){filter:brightness(1.1)}
+.picker-bar .secondary{
+  background:transparent;color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:6px 12px;font:600 11px system-ui;cursor:pointer;
+}
+.picker-bar .secondary:hover{background:var(--line)}
+.picker-bar .picker-status{margin-left:auto;font-size:12px;color:var(--muted)}
+.picker-bar .picker-status.ok{color:var(--good)}
+.picker-bar .picker-status.error{color:var(--bad)}
+@media (max-width:900px){
+  .picker-bar{flex-direction:column;align-items:stretch}
+  .picker-bar .picker-status{margin-left:0}
+}
 
 .actions{display:flex;gap:12px;align-items:center;margin-top:18px;flex-wrap:wrap}
 .actions button{

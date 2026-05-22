@@ -47,47 +47,36 @@
 
     <div id="coverageNote" class="sub" style="margin:18px 0 -4px 0"></div>
 
-    <h2 style="margin-top:18px">Periods to compare</h2>
-    <p class="sub" style="margin-top:-8px">
-      Defaults: <strong>Current</strong> = most recent full week.
-      <strong>Previous</strong> = week before. Change either to compare any
-      custom range — day, week, month, anything.
-    </p>
-
-    <div class="period-pickers">
-      <div class="card period-card">
-        <div class="row-head"><div><strong>Current period</strong></div></div>
-        <div class="period-inputs">
-          <label>From <input type="date" id="curFrom" /></label>
-          <label>To   <input type="date" id="curTo" /></label>
-        </div>
-        <div class="period-presets">
-          <button data-preset="last7" data-target="cur">Last 7 days</button>
-          <button data-preset="last30" data-target="cur">Last 30 days</button>
-          <button data-preset="lastWeek" data-target="cur">Most recent full week</button>
-          <button data-preset="lastMonth" data-target="cur">Most recent full month</button>
-        </div>
+    <div id="pickerBar" class="picker-bar">
+      <div class="picker-group">
+        <span class="picker-label">Current</span>
+        <input type="date" id="curFrom" />
+        <span class="picker-sep">→</span>
+        <input type="date" id="curTo" />
+        <select id="curPreset" title="Quick presets">
+          <option value="">Quick…</option>
+          <option value="last7">Last 7 days</option>
+          <option value="last30">Last 30 days</option>
+          <option value="lastWeek">Most recent full week</option>
+          <option value="lastMonth">Most recent full month</option>
+        </select>
       </div>
-
-      <div class="card period-card">
-        <div class="row-head"><div><strong>Previous period</strong></div></div>
-        <div class="period-inputs">
-          <label>From <input type="date" id="prevFrom" /></label>
-          <label>To   <input type="date" id="prevTo" /></label>
-        </div>
-        <div class="period-presets">
-          <button data-preset="priorEqual" data-target="prev">Equal range right before current</button>
-          <button data-preset="lastWeek-1" data-target="prev">Week before current</button>
-          <button data-preset="lastMonth-1" data-target="prev">Month before current</button>
-        </div>
+      <div class="picker-group">
+        <span class="picker-label prev">Previous</span>
+        <input type="date" id="prevFrom" />
+        <span class="picker-sep">→</span>
+        <input type="date" id="prevTo" />
+        <select id="prevPreset" title="Quick presets">
+          <option value="">Quick…</option>
+          <option value="priorEqual">Equal range right before current</option>
+          <option value="lastWeek-1">Week before current</option>
+          <option value="lastMonth-1">Month before current</option>
+        </select>
       </div>
-    </div>
-
-    <div class="actions">
-      <button id="generate" disabled>View comparison</button>
-      <button id="pushToStore" class="secondary" style="display:none">Push to shared store</button>
-      <button class="secondary admin-only" id="reset">Reset all</button>
-      <span id="status"></span>
+      <button id="generate" class="picker-go" disabled>View</button>
+      <button id="pushToStore" class="secondary" style="display:none">Push to store</button>
+      <button class="secondary admin-only" id="reset">Reset</button>
+      <span id="status" class="picker-status"></span>
     </div>
   </div>
 </div>
