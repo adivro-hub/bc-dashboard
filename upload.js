@@ -354,6 +354,15 @@
   }
 
   // Presets removed — date inputs only.
+
+  // ---- flatpickr: consistent calendar picker on every <input type="date"> ----
+  if (window.flatpickr){
+    window.flatpickr('input[type="date"]', {
+      dateFormat: 'Y-m-d',          // keep ISO so our date math doesn't change
+      allowInput: true,             // user can also type
+      disableMobile: true,          // use flatpickr UI everywhere, not OS native
+    });
+  }
   document.getElementById('overlayGenerate')?.addEventListener('click', () => {
     // Copy overlay inputs back to sticky-bar inputs, then generate + dismiss.
     ['curFrom','curTo','prevFrom','prevTo'].forEach(id => {

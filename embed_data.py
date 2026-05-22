@@ -40,11 +40,22 @@ if UPLOAD_MODE:
     out = out.replace("<body>", "<body>" + upload_ui)
     # Pull in SheetJS, Supabase (optional), config (optional), parsers, store, upload.
     # Theme bootstrap runs *before* CSS to avoid a flash of wrong theme.
+    # flatpickr provides a consistent calendar picker across browsers; pick
+    # the dark variant theme when the dashboard is in dark mode.
     head_extra = (
         '<script>'
         '(function(){var t=localStorage.getItem("bc-theme")||"dark";'
         'document.documentElement.setAttribute("data-theme",t);})();'
         '</script>\n'
+        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">\n'
+        '<script>'
+        '(function(){var t=document.documentElement.getAttribute("data-theme");'
+        'if(t==="dark"){var l=document.createElement("link");'
+        'l.rel="stylesheet";'
+        'l.href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css";'
+        'document.head.appendChild(l);}})();'
+        '</script>\n'
+        '<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
         '<script src="config.js" onerror="this.remove()"></script>\n'
