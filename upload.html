@@ -16,13 +16,60 @@
 <body><div id="authOverlay" class="overlay" style="display:none">
   <div class="overlay-card">
     <div class="overlay-brand">BC Operations Dashboard</div>
-    <h1 id="overlayTitle">Sign in to continue</h1>
-    <p class="overlay-sub" id="overlaySub">We'll email you a one-time sign-in link.</p>
-    <div class="overlay-form" id="overlayForm">
-      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
-      <button id="authSignIn">Send magic link</button>
+
+    <!-- STATE: sign-in -->
+    <div class="overlay-state" data-state="signin">
+      <h1 id="overlayTitle">Sign in to continue</h1>
+      <p class="overlay-sub" id="overlaySub">We'll email you a one-time sign-in link.</p>
+      <div class="overlay-form" id="overlayForm">
+        <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
+        <button id="authSignIn">Send magic link</button>
+      </div>
+      <p class="overlay-msg" id="overlayMsg"></p>
     </div>
-    <p class="overlay-msg" id="overlayMsg"></p>
+
+    <!-- STATE: loading data -->
+    <div class="overlay-state" data-state="loading" hidden>
+      <h1>Loading your data…</h1>
+      <p class="overlay-sub">Fetching the latest snapshot.</p>
+      <div class="overlay-spinner"></div>
+      <p class="overlay-msg" id="loadingMsg"></p>
+    </div>
+
+    <!-- STATE: pick periods -->
+    <div class="overlay-state" data-state="pickPeriod" hidden>
+      <h1>Pick periods to compare</h1>
+      <p class="overlay-sub" id="overlayCoverage"></p>
+
+      <div class="picker-modal-grid">
+        <div class="picker-modal-card">
+          <div class="picker-modal-label">CURRENT</div>
+          <label>From <input type="date" id="overlayCurFrom" /></label>
+          <label>To &nbsp;&nbsp;<input type="date" id="overlayCurTo" /></label>
+          <select id="overlayCurPreset">
+            <option value="">Quick presets…</option>
+            <option value="last7">Last 7 days</option>
+            <option value="last30">Last 30 days</option>
+            <option value="lastWeek">Most recent full week</option>
+            <option value="lastMonth">Most recent full month</option>
+          </select>
+        </div>
+        <div class="picker-modal-card">
+          <div class="picker-modal-label prev">PREVIOUS</div>
+          <label>From <input type="date" id="overlayPrevFrom" /></label>
+          <label>To &nbsp;&nbsp;<input type="date" id="overlayPrevTo" /></label>
+          <select id="overlayPrevPreset">
+            <option value="">Quick presets…</option>
+            <option value="priorEqual">Equal range right before current</option>
+            <option value="lastWeek-1">Week before current</option>
+            <option value="lastMonth-1">Month before current</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="overlayGenerate" class="overlay-cta">View comparison</button>
+      <p class="overlay-msg" id="overlayPickerMsg"></p>
+    </div>
   </div>
 </div>
 

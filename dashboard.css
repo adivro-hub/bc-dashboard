@@ -196,6 +196,51 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 .overlay-card.sent .overlay-form{display:none}
 .overlay-card.sent .overlay-msg{font-size:14px;color:var(--text);margin-top:0}
 
+/* Overlay state transitions: only one .overlay-state visible at a time */
+.overlay-state[hidden]{display:none !important}
+
+/* Loading state */
+.overlay-spinner{
+  width:36px;height:36px;border-radius:50%;
+  border:3px solid var(--line);border-top-color:var(--accent);
+  margin:28px auto 16px;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Pick-periods state */
+.overlay-card.picker-mode{max-width:640px}
+.picker-modal-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:22px 0 18px;
+}
+.picker-modal-card{
+  background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+  padding:14px;display:flex;flex-direction:column;gap:8px;text-align:left;
+}
+.picker-modal-label{
+  font-size:11px;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--accent);font-weight:700;margin-bottom:4px;
+}
+.picker-modal-label.prev{color:var(--prev)}
+.picker-modal-card label{
+  display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);
+}
+.picker-modal-card input[type=date],
+.picker-modal-card select{
+  background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:6px 8px;font:inherit;font-size:13px;
+  color-scheme:dark;flex:1;
+}
+.picker-modal-card select{margin-top:4px;cursor:pointer}
+.overlay-cta{
+  background:var(--accent);color:#0b1020;border:0;border-radius:10px;
+  padding:13px 28px;font:700 14px system-ui;cursor:pointer;letter-spacing:.3px;
+  width:100%;margin-top:4px;transition:filter .15s;
+}
+.overlay-cta:hover{filter:brightness(1.1)}
+@media (max-width:560px){
+  .picker-modal-grid{grid-template-columns:1fr}
+}
+
 /* ---- Auth bar (post-login chip) ---- */
 #authBar{
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;

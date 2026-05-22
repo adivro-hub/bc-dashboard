@@ -63,8 +63,16 @@
     const intro    = document.getElementById('introText');
     const overlay  = document.getElementById('authOverlay');
 
-    function showOverlay(opts={}){
+    function setOverlayState(state){
       overlay.style.display = '';
+      overlay.querySelectorAll('.overlay-state').forEach(el => {
+        el.hidden = (el.dataset.state !== state);
+      });
+      const card = overlay.querySelector('.overlay-card');
+      card.classList.toggle('picker-mode', state === 'pickPeriod');
+    }
+    function showOverlay(opts={}){
+      setOverlayState('signin');
       const title = document.getElementById('overlayTitle');
       const sub   = document.getElementById('overlaySub');
       const msg   = document.getElementById('overlayMsg');
@@ -76,6 +84,9 @@
       else            { msg.textContent = ''; msg.className = 'overlay-msg'; }
     }
     function hideOverlay(){ overlay.style.display = 'none'; }
+    // Expose for cross-function use
+    window._BC_setOverlayState = setOverlayState;
+    window._BC_hideOverlay = hideOverlay;
 
     if (!window.BCStore || !window.BCStore.enabled){
       // Local-only mode (no Supabase): keep the legacy flow, no overlay.
@@ -108,9 +119,8 @@
       return;
     }
 
-    // Authenticated + role found: hide the overlay, show the dashboard chrome.
-    hideOverlay();
-    bar.style.display = '';
+    // Authenticated + role found: keep the overlay up but transition to
+    // "loading" state while we fetch metadata + rows.
     bar.classList.add('signed-in');
     statusEl.innerHTML = `Signed in as <span class="who">${escapeHtml(email)}</span> <span class="role">${role}</span>`;
     if (role === 'uploader'){
@@ -123,8 +133,40 @@
       document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
       document.body.classList.add('viewer-mode');
     }
-    setStatus('Loading data…');
-    await loadFromStore();
+    setOverlayState('loading');
+    const loadingMsg = document.getElementById('loadingMsg');
+    if (loadingMsg) loadingMsg.textContent = '';
+    try {
+      await loadFromStore();
+    } catch (err){
+      if (loadingMsg){
+        loadingMsg.textContent = 'Could not load data: ' + (err.message || err);
+        loadingMsg.className = 'overlay-msg error';
+      }
+      return;
+    }
+    // Now move to period-picker state.
+    bar.style.display = '';   // ensure chip is ready when overlay closes
+    showPickPeriodState();
+  }
+
+  // Render the period-picker step in the overlay. Pre-fills inputs from the
+  // suggested defaults (set by suggestDefaultPeriods inside loadFromStore).
+  function showPickPeriodState(){
+    const fromCov = document.getElementById('overlayCoverage');
+    if (fromCov){
+      const cov = STORE?.coverage || { from: null, to: null };
+      fromCov.textContent = cov.from
+        ? `Data available: ${cov.from} → ${cov.to}`
+        : 'No data available yet.';
+    }
+    // Copy current sticky-bar dates into the overlay inputs
+    ['curFrom','curTo','prevFrom','prevTo'].forEach(id => {
+      const src = document.getElementById(id);
+      const dst = document.getElementById('overlay' + id.charAt(0).toUpperCase() + id.slice(1));
+      if (src && dst) dst.value = src.value;
+    });
+    window._BC_setOverlayState('pickPeriod');
   }
   async function signIn(){
     const emailInput = document.getElementById('authEmail');
@@ -306,6 +348,67 @@
   document.getElementById('prevPreset')?.addEventListener('change', e => {
     if (e.target.value) { applyPreset(e.target.value, 'prev'); e.target.value = ''; }
   });
+
+  // Overlay preset dropdowns — same effect, but updates the OVERLAY inputs.
+  document.getElementById('overlayCurPreset')?.addEventListener('change', e => {
+    if (e.target.value) { applyOverlayPreset(e.target.value, 'cur'); e.target.value = ''; }
+  });
+  document.getElementById('overlayPrevPreset')?.addEventListener('change', e => {
+    if (e.target.value) { applyOverlayPreset(e.target.value, 'prev'); e.target.value = ''; }
+  });
+  document.getElementById('overlayGenerate')?.addEventListener('click', () => {
+    // Copy overlay inputs back to sticky-bar inputs, then generate + dismiss.
+    ['curFrom','curTo','prevFrom','prevTo'].forEach(id => {
+      const src = document.getElementById('overlay' + id.charAt(0).toUpperCase() + id.slice(1));
+      const dst = document.getElementById(id);
+      if (src && dst) dst.value = src.value;
+    });
+    const cf = document.getElementById('curFrom').value;
+    const ct = document.getElementById('curTo').value;
+    if (!cf || !ct){
+      const m = document.getElementById('overlayPickerMsg');
+      if (m){ m.textContent = 'Pick the Current period first.'; m.className = 'overlay-msg error'; }
+      return;
+    }
+    window._BC_hideOverlay();
+    generate();
+  });
+
+  // Mirror of applyPreset but writes to the overlay inputs. Re-uses date math.
+  function applyOverlayPreset(preset, target){
+    if (!STORE.coverage.to) return;
+    const to = STORE.coverage.to;
+    function addDays(iso, n){
+      const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n);
+      return d.toISOString().slice(0,10);
+    }
+    function daysBetween(a, b){
+      return Math.round((new Date(b+'T12:00:00Z') - new Date(a+'T12:00:00Z'))/86400000);
+    }
+    let from, until;
+    if (target === 'cur'){
+      if (preset === 'last7')      { until = to; from = addDays(to, -6); }
+      else if (preset === 'last30'){ until = to; from = addDays(to, -29); }
+      else if (preset === 'lastWeek'){ until = to; from = addDays(to, -6); }
+      else if (preset === 'lastMonth'){ until = to; from = addDays(to, -29); }
+      document.getElementById('overlayCurFrom').value = from;
+      document.getElementById('overlayCurTo').value   = until;
+    } else {
+      const curFrom = document.getElementById('overlayCurFrom').value;
+      const curTo   = document.getElementById('overlayCurTo').value;
+      if (!curFrom || !curTo) return;
+      const len = daysBetween(curFrom, curTo) + 1;
+      if (preset === 'priorEqual'){
+        until = addDays(curFrom, -1); from = addDays(until, -(len-1));
+      } else if (preset === 'lastWeek-1'){
+        until = addDays(curFrom, -1); from = addDays(until, -6);
+      } else if (preset === 'lastMonth-1'){
+        until = addDays(curFrom, -1); from = addDays(until, -29);
+      }
+      document.getElementById('overlayPrevFrom').value = from;
+      document.getElementById('overlayPrevTo').value   = until;
+    }
+  }
 
   function setStatus(msg, cls=''){ statusEl.textContent = msg; statusEl.className = cls; }
 
