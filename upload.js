@@ -353,21 +353,24 @@
     };
   }
 
-  // Preset dropdowns (sticky picker)
-  document.getElementById('curPreset')?.addEventListener('change', e => {
-    if (e.target.value) { applyPreset(e.target.value, 'cur'); e.target.value = ''; }
-  });
-  document.getElementById('prevPreset')?.addEventListener('change', e => {
-    if (e.target.value) { applyPreset(e.target.value, 'prev'); e.target.value = ''; }
-  });
-
-  // Overlay preset dropdowns — same effect, but updates the OVERLAY inputs.
-  document.getElementById('overlayCurPreset')?.addEventListener('change', e => {
-    if (e.target.value) { applyOverlayPreset(e.target.value, 'cur'); e.target.value = ''; }
-  });
-  document.getElementById('overlayPrevPreset')?.addEventListener('change', e => {
-    if (e.target.value) { applyOverlayPreset(e.target.value, 'prev'); e.target.value = ''; }
-  });
+  // Preset dropdowns: keep the chosen option visible after applying.
+  // If the user then edits the date inputs by hand, clear the dropdown so it
+  // doesn't lie about what range is currently set.
+  function wirePreset(selectId, target, apply, fromId, toId){
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.addEventListener('change', e => {
+      if (e.target.value) apply(e.target.value, target);
+    });
+    [fromId, toId].forEach(id => {
+      const inp = document.getElementById(id);
+      inp?.addEventListener('input', () => { sel.value = ''; });
+    });
+  }
+  wirePreset('curPreset',         'cur',  applyPreset,        'curFrom',        'curTo');
+  wirePreset('prevPreset',        'prev', applyPreset,        'prevFrom',       'prevTo');
+  wirePreset('overlayCurPreset',  'cur',  applyOverlayPreset, 'overlayCurFrom', 'overlayCurTo');
+  wirePreset('overlayPrevPreset', 'prev', applyOverlayPreset, 'overlayPrevFrom','overlayPrevTo');
   document.getElementById('overlayGenerate')?.addEventListener('click', () => {
     // Copy overlay inputs back to sticky-bar inputs, then generate + dismiss.
     ['curFrom','curTo','prevFrom','prevTo'].forEach(id => {
