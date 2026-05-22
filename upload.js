@@ -304,7 +304,6 @@
       recomputeCoverage();
       refreshSummary();
       suggestDefaultPeriods();
-      const isUploader = document.body.classList.contains('uploader-mode');
       const msg = isUploader
         ? `Loaded ${STORE.job_rows.length.toLocaleString()} job rows. Pick periods.`
         : 'Ready — pick periods to compare.';
