@@ -37,7 +37,6 @@
       <p class="overlay-msg" id="loadingMsg"></p>
       <div class="overlay-footer">
         <button class="overlay-signout">Sign out</button>
-        <button class="theme-toggle overlay-theme">🌙 Theme</button>
       </div>
     </div>
 
@@ -76,13 +75,7 @@
       <p class="overlay-msg" id="overlayPickerMsg"></p>
       <div class="overlay-footer">
         <button class="overlay-signout">Sign out</button>
-        <button class="theme-toggle overlay-theme">🌙 Theme</button>
       </div>
-    </div>
-
-    <!-- Footer for signin state too (theme toggle only — nothing to sign out from) -->
-    <div class="overlay-footer" id="signinFooter">
-      <button class="theme-toggle overlay-theme">🌙 Theme</button>
     </div>
   </div>
 </div>
@@ -99,7 +92,6 @@
     <span id="authStatus"></span>
     <button id="authSignOut" class="secondary">Sign out</button>
     <button id="loadFromStore" class="secondary">Refresh data</button>
-    <button class="theme-toggle" id="barThemeToggle">🌙 Theme</button>
     <span id="authHint" class="mode-hint"></span>
   </div>
 
@@ -399,6 +391,10 @@
       <strong>Fulfilment rate</strong> = DONE ÷ (DONE + CANCELLED).
     </p>
   </div><!-- /view-ops -->
+
+  <footer class="page-footer">
+    <button class="theme-toggle">🌙 Theme</button>
+  </footer>
 
 </div><!-- /#dashboard-area -->
 </div><!-- /.wrap -->

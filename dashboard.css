@@ -10,13 +10,29 @@
 }
 :root[data-theme="light"]{
   --bg:#f5f7fb; --panel:#ffffff; --panel-2:#eef1f7; --line:#dde2ec;
-  --text:#1a2138; --muted:#5d6788; --accent:#4b6dff;
+  --text:#1a2138; --muted:#5d6788; --accent:#dcd045;
   --curr:#4b6dff; --prev:#e08a3c; --good:#1c9e6a; --bad:#d63b5b;
   --shadow:0 4px 18px rgba(20,30,60,.08);
   --radius:14px;
   --picker-bar-bg:rgba(245,247,251,.92);
   --overlay-bg:rgba(245,247,251,.92);
   color-scheme:light;
+}
+
+/* Light theme: primary CTAs become black with white text */
+:root[data-theme="light"] .overlay-form button,
+:root[data-theme="light"] .overlay-cta,
+:root[data-theme="light"] .picker-bar .picker-go,
+:root[data-theme="light"] .actions button:not(.secondary){
+  background:#0b1020;
+  color:#ffffff;
+}
+:root[data-theme="light"] .overlay-form button:hover:not(:disabled),
+:root[data-theme="light"] .overlay-cta:hover,
+:root[data-theme="light"] .picker-bar .picker-go:hover:not(:disabled),
+:root[data-theme="light"] .actions button:not(.secondary):hover:not(:disabled){
+  background:#1a2138;
+  filter:none;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
@@ -267,13 +283,19 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 }
 .overlay-footer button:hover, .overlay-footer a:hover{color:var(--text)}
 
-/* Theme toggle (works both in auth chip and overlay footer) */
+/* Theme toggle (now lives only in the page footer) */
 .theme-toggle{
   background:transparent;border:1px solid var(--line);
   border-radius:6px;padding:4px 10px;font:600 11px system-ui;
   color:var(--text);cursor:pointer;letter-spacing:.3px;
 }
 .theme-toggle:hover{background:var(--panel-2)}
+
+/* Page footer — small, centered, holds the theme toggle */
+.page-footer{
+  display:flex;justify-content:center;
+  margin-top:40px;padding:24px 0 32px;border-top:1px solid var(--line);
+}
 
 /* ---- Auth bar (post-login chip) ---- */
 #authBar{
