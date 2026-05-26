@@ -266,7 +266,6 @@
       const lastFull = [...weeks].reverse().find(w => !w.partial);
       const def = lastFull || weeks[weeks.length-1];
       if (def) weekSel.value = String(def.n);
-      updateWeekHint();
     }
 
     // Month select
@@ -286,7 +285,6 @@
       const lastFull = [...months].reverse().find(mo => !mo.partial);
       const def = lastFull || months[months.length-1];
       if (def) monSel.value = `${def.y}-${String(def.m).padStart(2,'0')}`;
-      updateMonthHint();
     }
 
     // Custom panel — copy sticky-bar dates over as a starting point.
@@ -296,74 +294,107 @@
       if (src && dst) dst.value = src.value;
     });
 
+    // Reset the override block so the auto-previous default is used.
+    const override = document.getElementById('prevOverrideBlock');
+    const link     = document.getElementById('prevOverrideToggle');
+    if (override) override.hidden = true;
+    if (link)     link.textContent = 'Choose a different previous period';
+
+    updatePrevHint();
     window._BC_setOverlayState('pickPeriod');
   }
 
-  // Show the "vs previous week" / "vs previous month" line under each select.
-  function updateWeekHint(){
-    const sel = document.getElementById('weekSelect');
-    const hint = document.getElementById('weekHint');
-    if (!sel || !hint) return;
-    const opt = sel.selectedOptions[0];
-    if (!opt){ hint.textContent = ''; return; }
-    const from = opt.dataset.from;
-    const prevFrom = addDays(from, -7);
-    const prevTo   = addDays(from, -1);
-    hint.textContent = `Compared against the previous week: ${dmy(prevFrom)} → ${dmy(prevTo)}`;
+  // -------------------------------------------------------------------
+  // Shared previous-period hint + override.
+  //
+  // Auto-previous logic:
+  //   weekly  -> the calendar week immediately before the selected one
+  //   monthly -> the calendar month immediately before the selected one
+  //   custom  -> equal-length window ending the day before curFrom
+  //
+  // The user can override via the prev-override block (toggled by the
+  // small "Choose a different previous period" link).
+  // -------------------------------------------------------------------
+
+  function autoPreviousFor(periods){
+    if (!periods || !periods.curFrom || !periods.curTo) return { from: '', to: '', label: '' };
+    if (periods.type === 'weekly'){
+      const from = addDays(periods.curFrom, -7);
+      const to   = addDays(periods.curFrom, -1);
+      return { from, to, label: `the previous week (${dmy(from)} → ${dmy(to)})` };
+    }
+    if (periods.type === 'monthly'){
+      const [y, m] = periods.curFrom.slice(0,7).split('-').map(Number);
+      let py = y, pm = m - 1; if (pm === 0){ pm = 12; py--; }
+      const ppad = String(pm).padStart(2,'0');
+      const from = `${py}-${ppad}-01`;
+      const to   = `${py}-${ppad}-${String(lastDayOfMonth(py, pm)).padStart(2,'0')}`;
+      return { from, to, label: `${MONTH_NAMES[pm-1]} ${py} (${dmy(from)} → ${dmy(to)})` };
+    }
+    // custom
+    const days = Math.max(1, Math.round(
+      (new Date(periods.curTo + 'T12:00:00Z') - new Date(periods.curFrom + 'T12:00:00Z'))/86400000) + 1);
+    const to = addDays(periods.curFrom, -1);
+    const from = addDays(to, -(days-1));
+    return { from, to, label: `the prior ${days}-day window (${dmy(from)} → ${dmy(to)})` };
   }
-  function updateMonthHint(){
-    const sel = document.getElementById('monthSelect');
-    const hint = document.getElementById('monthHint');
-    if (!sel || !hint) return;
-    const opt = sel.selectedOptions[0];
-    if (!opt){ hint.textContent = ''; return; }
-    const [y, m] = opt.value.split('-').map(Number);
-    let py = y, pm = m - 1; if (pm === 0){ pm = 12; py--; }
-    const ppad = String(pm).padStart(2,'0');
-    const lastDay = lastDayOfMonth(py, pm);
-    const prevFrom = `${py}-${ppad}-01`;
-    const prevTo   = `${py}-${ppad}-${String(lastDay).padStart(2,'0')}`;
-    hint.textContent = `Compared against ${MONTH_NAMES[pm-1]} ${py}: ${dmy(prevFrom)} → ${dmy(prevTo)}`;
+
+  function activePeriodType(){
+    const btn = document.querySelector('.period-type-btn.active');
+    return btn ? btn.dataset.type : 'weekly';
+  }
+
+  // Compute the current-period (curFrom, curTo) from whichever tab is
+  // active. Doesn't compute the previous — that's autoPreviousFor's job.
+  function currentSelection(){
+    const type = activePeriodType();
+    if (type === 'weekly'){
+      const opt = document.getElementById('weekSelect')?.selectedOptions?.[0];
+      if (!opt) return null;
+      return { type, curFrom: opt.dataset.from, curTo: opt.dataset.to };
+    }
+    if (type === 'monthly'){
+      const opt = document.getElementById('monthSelect')?.selectedOptions?.[0];
+      if (!opt) return null;
+      return { type, curFrom: opt.dataset.from, curTo: opt.dataset.to };
+    }
+    return {
+      type,
+      curFrom: document.getElementById('overlayCurFrom').value,
+      curTo:   document.getElementById('overlayCurTo').value,
+    };
+  }
+
+  function updatePrevHint(){
+    const sel = currentSelection();
+    const span = document.getElementById('prevHintText');
+    if (!span) return;
+    const prev = autoPreviousFor(sel);
+    span.textContent = prev.label || '—';
   }
 
   // Resolve the user's overlay selection into { curFrom, curTo, prevFrom, prevTo }.
   function resolveOverlayPeriods(){
-    const activeBtn = document.querySelector('.period-type-btn.active');
-    const type = activeBtn ? activeBtn.dataset.type : 'weekly';
-    let curFrom, curTo, prevFrom, prevTo;
+    const cur = currentSelection();
+    if (!cur || !cur.curFrom || !cur.curTo) return null;
 
-    if (type === 'weekly'){
-      const opt = document.getElementById('weekSelect')?.selectedOptions?.[0];
-      if (!opt) return null;
-      curFrom = opt.dataset.from;
-      curTo   = opt.dataset.to;
-      // Previous week = 7 days earlier (full week, even if current is partial)
-      prevFrom = addDays(opt.dataset.from, -7);
-      prevTo   = addDays(opt.dataset.from, -1);
-    } else if (type === 'monthly'){
-      const opt = document.getElementById('monthSelect')?.selectedOptions?.[0];
-      if (!opt) return null;
-      const [y, m] = opt.value.split('-').map(Number);
-      curFrom = opt.dataset.from;
-      curTo   = opt.dataset.to;
-      let py = y, pm = m - 1; if (pm === 0){ pm = 12; py--; }
-      const ppad = String(pm).padStart(2,'0');
-      prevFrom = `${py}-${ppad}-01`;
-      prevTo   = `${py}-${ppad}-${String(lastDayOfMonth(py, pm)).padStart(2,'0')}`;
-    } else { // custom
-      curFrom  = document.getElementById('overlayCurFrom').value;
-      curTo    = document.getElementById('overlayCurTo').value;
-      prevFrom = document.getElementById('overlayPrevFrom').value || '';
-      prevTo   = document.getElementById('overlayPrevTo').value   || '';
-      // Auto previous = equal-length window ending the day before curFrom
-      if (curFrom && curTo && (!prevFrom || !prevTo)){
-        const days = Math.max(1, Math.round(
-          (new Date(curTo + 'T12:00:00Z') - new Date(curFrom + 'T12:00:00Z'))/86400000) + 1);
-        prevTo   = addDays(curFrom, -1);
-        prevFrom = addDays(prevTo, -(days-1));
-      }
+    // Previous: use override inputs if the override is visible AND both
+    // dates are filled; otherwise derive automatically from current.
+    const overrideBlock = document.getElementById('prevOverrideBlock');
+    const overrideOn = overrideBlock && !overrideBlock.hidden;
+    const overrideFrom = document.getElementById('overlayPrevFrom').value;
+    const overrideTo   = document.getElementById('overlayPrevTo').value;
+
+    let prevFrom, prevTo;
+    if (overrideOn && overrideFrom && overrideTo){
+      prevFrom = overrideFrom;
+      prevTo   = overrideTo;
+    } else {
+      const auto = autoPreviousFor(cur);
+      prevFrom = auto.from;
+      prevTo   = auto.to;
     }
-    return { curFrom, curTo, prevFrom, prevTo, type };
+    return { curFrom: cur.curFrom, curTo: cur.curTo, prevFrom, prevTo, type: cur.type };
   }
   async function signIn(){
     const emailInput = document.getElementById('authEmail');
@@ -546,10 +577,39 @@
       });
       const m = document.getElementById('overlayPickerMsg');
       if (m){ m.textContent = ''; m.className = 'overlay-msg'; }
+      updatePrevHint();
     });
   });
-  document.getElementById('weekSelect')?.addEventListener('change', updateWeekHint);
-  document.getElementById('monthSelect')?.addEventListener('change', updateMonthHint);
+  document.getElementById('weekSelect')?.addEventListener('change', updatePrevHint);
+  document.getElementById('monthSelect')?.addEventListener('change', updatePrevHint);
+  // Custom-tab inputs: keep the auto-previous hint in sync as user types.
+  ['overlayCurFrom','overlayCurTo'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', updatePrevHint);
+  });
+
+  // Override toggle: small "Choose a different previous period" link.
+  // Clicking reveals the date-picker block; while it's open the user's
+  // values take precedence over the auto-derived ones.
+  document.getElementById('prevOverrideToggle')?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    const block = document.getElementById('prevOverrideBlock');
+    const link  = document.getElementById('prevOverrideToggle');
+    if (!block) return;
+    if (block.hidden){
+      // Prefill with the current auto-derived values so the picker
+      // opens at the "default" rather than a blank state.
+      const auto = autoPreviousFor(currentSelection());
+      if (auto && auto.from){
+        document.getElementById('overlayPrevFrom').value = auto.from;
+        document.getElementById('overlayPrevTo').value   = auto.to;
+      }
+      block.hidden = false;
+      if (link) link.textContent = 'Use the default previous period';
+    } else {
+      block.hidden = true;
+      if (link) link.textContent = 'Choose a different previous period';
+    }
+  });
 
   document.getElementById('overlayGenerate')?.addEventListener('click', () => {
     const m = document.getElementById('overlayPickerMsg');

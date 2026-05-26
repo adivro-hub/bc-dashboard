@@ -60,30 +60,31 @@
         <label>Week
           <select id="weekSelect"></select>
         </label>
-        <p class="period-hint" id="weekHint"></p>
       </div>
 
       <div class="period-panel" data-panel="monthly" hidden>
         <label>Month
           <select id="monthSelect"></select>
         </label>
-        <p class="period-hint" id="monthHint"></p>
       </div>
 
       <div class="period-panel" data-panel="custom" hidden>
-        <div class="picker-modal-grid">
-          <div class="picker-modal-card">
-            <div class="picker-modal-label">CURRENT</div>
-            <label>From <input type="date" id="overlayCurFrom" /></label>
-            <label>To &nbsp;&nbsp;<input type="date" id="overlayCurTo" /></label>
-          </div>
-          <div class="picker-modal-card">
-            <div class="picker-modal-label prev">PREVIOUS</div>
-            <label>From <input type="date" id="overlayPrevFrom" /></label>
-            <label>To &nbsp;&nbsp;<input type="date" id="overlayPrevTo" /></label>
-          </div>
+        <div class="picker-modal-card">
+          <div class="picker-modal-label">CURRENT</div>
+          <label>From <input type="date" id="overlayCurFrom" /></label>
+          <label>To &nbsp;&nbsp;<input type="date" id="overlayCurTo" /></label>
         </div>
-        <p class="period-hint">Leaving "previous" blank uses the equal-length window immediately before the current period.</p>
+      </div>
+
+      <p class="period-hint period-prev-line">
+        Will be compared against <span id="prevHintText">—</span>.
+        <a href="#" id="prevOverrideToggle" class="prev-override-link">Choose a different previous period</a>
+      </p>
+
+      <div id="prevOverrideBlock" class="picker-modal-card prev-override-card" hidden>
+        <div class="picker-modal-label prev">PREVIOUS</div>
+        <label>From <input type="date" id="overlayPrevFrom" /></label>
+        <label>To &nbsp;&nbsp;<input type="date" id="overlayPrevTo" /></label>
       </div>
 
       <button id="overlayGenerate" class="overlay-cta">View comparison</button>

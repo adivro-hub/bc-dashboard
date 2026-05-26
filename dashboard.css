@@ -298,8 +298,15 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
   cursor:pointer;width:100%;color-scheme:dark;
 }
 .period-hint{
-  font-size:11px;color:var(--muted);margin:10px 2px 0;line-height:1.5;
+  font-size:12px;color:var(--muted);margin:10px 2px 0;line-height:1.5;
 }
+.period-prev-line{margin:8px 2px 12px}
+.period-prev-line #prevHintText{color:var(--text);font-weight:500}
+.prev-override-link{
+  color:var(--accent);text-decoration:none;margin-left:4px;font-weight:500;
+}
+.prev-override-link:hover{text-decoration:underline}
+.prev-override-card{margin:0 0 14px}
 
 /* Overlay footer with sign-out + theme toggle, shown on loading + pickPeriod */
 .overlay-footer{
