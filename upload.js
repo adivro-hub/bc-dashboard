@@ -324,12 +324,15 @@
       return { from, to, label: `the previous week (${dmy(from)} → ${dmy(to)})` };
     }
     if (periods.type === 'monthly'){
-      const [y, m] = periods.curFrom.slice(0,7).split('-').map(Number);
-      let py = y, pm = m - 1; if (pm === 0){ pm = 12; py--; }
-      const ppad = String(pm).padStart(2,'0');
-      const from = `${py}-${ppad}-01`;
-      const to   = `${py}-${ppad}-${String(lastDayOfMonth(py, pm)).padStart(2,'0')}`;
-      return { from, to, label: `${MONTH_NAMES[pm-1]} ${py} (${dmy(from)} → ${dmy(to)})` };
+      // Equal-length window ending the day before curFrom so a 28-day
+      // February isn't pitted against a 31-day January. For full-month
+      // current periods this lands on the trailing portion of the
+      // previous month (e.g. Feb 2025 -> 04.01 .. 31.01).
+      const days = Math.max(1, Math.round(
+        (new Date(periods.curTo + 'T12:00:00Z') - new Date(periods.curFrom + 'T12:00:00Z'))/86400000) + 1);
+      const to = addDays(periods.curFrom, -1);
+      const from = addDays(to, -(days-1));
+      return { from, to, label: `the prior ${days} days (${dmy(from)} → ${dmy(to)})` };
     }
     // custom
     const days = Math.max(1, Math.round(
