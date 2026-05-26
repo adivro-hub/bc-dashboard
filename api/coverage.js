@@ -26,16 +26,20 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
 
   try {
+    // to_char(..., 'YYYY-MM-DD') keeps dates as plain strings so the
+    // pg driver doesn't convert them to UTC midnight Date objects
+    // (which would shift e.g. 2025-01-01 to 2024-12-31T22:00:00Z in
+    // a UTC+2 locale and confuse the frontend).
     const [jobRow] = await query(
-      `SELECT COUNT(*)::int AS rows,
-              MIN(job_date)  AS date_min,
-              MAX(job_date)  AS date_max
+      `SELECT COUNT(*)::int                            AS rows,
+              to_char(MIN(job_date), 'YYYY-MM-DD')     AS date_min,
+              to_char(MAX(job_date), 'YYYY-MM-DD')     AS date_max
        FROM job_analogue`
     );
     const [regRow] = await query(
-      `SELECT COUNT(*)::int AS rows,
-              MIN(created_at) AS created_min,
-              MAX(created_at) AS created_max
+      `SELECT COUNT(*)::int                                  AS rows,
+              to_char(MIN(created_at), 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_min,
+              to_char(MAX(created_at), 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_max
        FROM registrations`
     );
 
@@ -44,9 +48,9 @@ export default async function handler(req, res) {
     for (const v of INCOME_VIEWS) {
       try {
         const [r] = await query(
-          `SELECT COUNT(*)::int AS rows,
-                  MIN("Date") AS date_min,
-                  MAX("Date") AS date_max
+          `SELECT COUNT(*)::int                          AS rows,
+                  to_char(MIN("Date"), 'YYYY-MM-DD')     AS date_min,
+                  to_char(MAX("Date"), 'YYYY-MM-DD')     AS date_max
            FROM ${v}`
         );
         income[v] = r;
