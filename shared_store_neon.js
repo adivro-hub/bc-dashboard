@@ -125,6 +125,11 @@ async function loadHoursForRange(from, to){
 // without rewriting them.
 // -----------------------------------------------------------------
 function synthFile(prefix, dateMin, dateMax, rowCount){
+  // Note: hourly is an empty object (not null) and timestamps an empty
+  // array because upload.js's deriveByHourOfDay() calls Object.keys(hourly)
+  // on every entry — a null there throws TypeError and abort the whole
+  // loadFromStore(), which (silently) prevents reg_files from being
+  // populated and hides the User Registrations section.
   return [{
     id: `${prefix}-neon`,
     source_name: `${prefix} (Neon)`,
@@ -135,10 +140,10 @@ function synthFile(prefix, dateMin, dateMax, rowCount){
     row_count:    rowCount,
     uploaded_at:  new Date().toISOString(),
     uploaded_by:  null,
-    sections:     null,
+    sections:     {},
     kpis:         null,
     timestamps:   [],
-    hourly:       null,
+    hourly:       {},
   }];
 }
 
