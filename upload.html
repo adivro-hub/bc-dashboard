@@ -11,10 +11,12 @@
 <script>(function(){var t=document.documentElement.getAttribute("data-theme");if(t==="dark"){var l=document.createElement("link");l.rel="stylesheet";l.href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css";document.head.appendChild(l);}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Neon-backed backend. Supabase is no longer used at runtime.
+     config.js is kept around in case any legacy path still reads
+     window.BC_CONFIG — harmless when the file is absent (onerror=this.remove). -->
 <script src="config.js" onerror="this.remove()"></script>
 <script src="parsers.js" defer></script>
-<script src="shared_store.js" defer></script>
+<script src="shared_store_neon.js" defer></script>
 <script src="upload.js" defer></script>
 </head>
 <body><div id="authOverlay" class="overlay" style="display:none">
