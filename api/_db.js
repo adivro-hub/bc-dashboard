@@ -93,42 +93,55 @@ export function bad(res, status, message, extra = {}) {
 }
 
 /**
- * Bearer-token guard.
+ * Auth guard. Accepts either:
+ *   (a) a valid JWT session cookie (set by /api/auth/verify), or
+ *   (b) the shared bearer token in env API_TOKEN (for cron / curl /
+ *       smoke tests / scheduled jobs).
  *
- * Defence-in-depth gate that runs before every /api/* handler until real
- * magic-link auth is in place. Behaviour:
- *
- *   - If env var API_TOKEN is set: request MUST present
- *       Authorization: Bearer <API_TOKEN>     (or ?token=<API_TOKEN>)
- *     otherwise the handler returns 401 and never touches Neon.
- *   - If API_TOKEN is NOT set: the request is allowed (so local smoke
- *     tests still work). Production deploys MUST set the env var.
+ * When neither matches, returns 401 and writes the response. On success
+ * attaches req.session = { email, role } when authenticated via cookie;
+ * bearer auth leaves req.session unset.
  *
  * Returns `true` if the request is allowed; otherwise writes a 401 to
  * `res` and returns `false` — callers should `return` immediately when
  * this returns false.
+ *
+ * NOTE: this function is async (cookie verification involves JWT
+ * crypto), so handlers must `if (!await requireAuth(req, res)) return;`.
  */
-export function requireAuth(req, res) {
+export async function requireAuth(req, res) {
+  // 1) Cookie / JWT session.
+  try {
+    const { getSessionFromRequest } = await import('./_auth.js');
+    const session = await getSessionFromRequest(req);
+    if (session) {
+      req.session = session;
+      return true;
+    }
+  } catch (e) {
+    // If _auth.js can't load (e.g. JWT_SECRET missing in dev), fall
+    // through to bearer-token path.
+    console.warn('cookie auth check failed:', e.message);
+  }
+
+  // 2) Bearer token / ?token=
   const expected = process.env.API_TOKEN;
-  if (!expected) return true; // not configured — allow (dev only)
+  if (!expected) return true; // both auth methods unconfigured — dev only
 
   const auth = req.headers['authorization'] || '';
   let token = '';
   if (auth.startsWith('Bearer ')) {
     token = auth.slice('Bearer '.length).trim();
   } else {
-    // Allow ?token= for quick curl tests
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
       token = url.searchParams.get('token') || '';
     } catch { /* ignore */ }
   }
-
-  // Constant-time comparison via Buffer (small inputs so timing leakage
-  // is not the threat model — just resist trivial guessing).
   if (token && token.length === expected.length && token === expected) {
     return true;
   }
+
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('WWW-Authenticate', 'Bearer');
   res.status(401).send(JSON.stringify({ error: 'unauthorized' }));

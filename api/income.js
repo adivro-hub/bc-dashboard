@@ -43,7 +43,7 @@ const SECTIONS = {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
-  if (!requireAuth(req, res)) return;
+  if (!await requireAuth(req, res)) return;
 
   const url = new URL(req.url, `http://${req.headers.host}`);
   const section = (url.searchParams.get('section') || '').toLowerCase();

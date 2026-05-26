@@ -22,7 +22,7 @@ const SUPPLY_REGEX =
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
-  if (!requireAuth(req, res)) return;
+  if (!await requireAuth(req, res)) return;
   let from, to;
   try {
     ({ from, to } = parseDateRange(req));

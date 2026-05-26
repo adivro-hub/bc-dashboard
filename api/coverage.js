@@ -24,7 +24,7 @@ const INCOME_VIEWS = [
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
-  if (!requireAuth(req, res)) return;
+  if (!await requireAuth(req, res)) return;
 
   try {
     // to_char(..., 'YYYY-MM-DD') keeps dates as plain strings so the
