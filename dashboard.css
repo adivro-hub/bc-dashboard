@@ -245,6 +245,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
   background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
   padding:14px;display:flex;flex-direction:column;gap:8px;text-align:left;
 }
+.picker-modal-card[hidden]{display:none !important}
 .picker-modal-label{
   font-size:11px;text-transform:uppercase;letter-spacing:.8px;
   color:var(--accent);font-weight:700;margin-bottom:4px;
