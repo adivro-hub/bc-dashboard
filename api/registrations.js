@@ -4,7 +4,7 @@
  *
  * Response: { from, to, group_by, total, rows: [{ key, count }, ...] }
  */
-import { query, ok, bad, parseDateRange } from './_db.js';
+import { query, ok, bad, parseDateRange, requireAuth } from './_db.js';
 
 const GROUP_EXPR = {
   day:     "to_char(created_at, 'YYYY-MM-DD')",
@@ -14,6 +14,7 @@ const GROUP_EXPR = {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
+  if (!requireAuth(req, res)) return;
   const url = new URL(req.url, `http://${req.headers.host}`);
   const groupBy = (url.searchParams.get('group_by') || 'day').toLowerCase();
   if (!GROUP_EXPR[groupBy]) {

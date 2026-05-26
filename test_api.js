@@ -27,11 +27,11 @@ function mockRes() {
 }
 
 function mockReq(path) {
-  return {
-    method: 'GET',
-    url: path,
-    headers: { host: 'localhost' },
-  };
+  const headers = { host: 'localhost' };
+  if (process.env.API_TOKEN) {
+    headers.authorization = `Bearer ${process.env.API_TOKEN}`;
+  }
+  return { method: 'GET', url: path, headers };
 }
 
 async function hit(handler, path, label) {

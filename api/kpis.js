@@ -15,13 +15,14 @@
  *     hours:    null   // populated once Hour Statistics lands
  *   }
  */
-import { query, ok, bad, parseDateRange } from './_db.js';
+import { query, ok, bad, parseDateRange, requireAuth } from './_db.js';
 
 const SUPPLY_REGEX =
   '(no cars available|serviciul .*indisponibil|nicio ma[sș]in[aă]|nu vrea sa astepte|sofer de la bv)';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
+  if (!requireAuth(req, res)) return;
   let from, to;
   try {
     ({ from, to } = parseDateRange(req));

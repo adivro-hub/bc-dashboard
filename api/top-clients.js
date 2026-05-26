@@ -12,12 +12,13 @@
  *     account_number, account_name, jobs, total_price, driver_price,
  *     earnings (total_price - driver_price)
  */
-import { query, ok, bad, parseDateRange } from './_db.js';
+import { query, ok, bad, parseDateRange, requireAuth } from './_db.js';
 
 const PUBLIC_ACCOUNT_NO = 110000;
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
+  if (!requireAuth(req, res)) return;
   const url = new URL(req.url, `http://${req.headers.host}`);
   const segment = (url.searchParams.get('segment') || 'all').toLowerCase();
   const limit = Math.min(

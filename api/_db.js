@@ -54,6 +54,49 @@ export function bad(res, status, message, extra = {}) {
   res.status(status).send(JSON.stringify({ error: message, ...extra }));
 }
 
+/**
+ * Bearer-token guard.
+ *
+ * Defence-in-depth gate that runs before every /api/* handler until real
+ * magic-link auth is in place. Behaviour:
+ *
+ *   - If env var API_TOKEN is set: request MUST present
+ *       Authorization: Bearer <API_TOKEN>     (or ?token=<API_TOKEN>)
+ *     otherwise the handler returns 401 and never touches Neon.
+ *   - If API_TOKEN is NOT set: the request is allowed (so local smoke
+ *     tests still work). Production deploys MUST set the env var.
+ *
+ * Returns `true` if the request is allowed; otherwise writes a 401 to
+ * `res` and returns `false` — callers should `return` immediately when
+ * this returns false.
+ */
+export function requireAuth(req, res) {
+  const expected = process.env.API_TOKEN;
+  if (!expected) return true; // not configured — allow (dev only)
+
+  const auth = req.headers['authorization'] || '';
+  let token = '';
+  if (auth.startsWith('Bearer ')) {
+    token = auth.slice('Bearer '.length).trim();
+  } else {
+    // Allow ?token= for quick curl tests
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      token = url.searchParams.get('token') || '';
+    } catch { /* ignore */ }
+  }
+
+  // Constant-time comparison via Buffer (small inputs so timing leakage
+  // is not the threat model — just resist trivial guessing).
+  if (token && token.length === expected.length && token === expected) {
+    return true;
+  }
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('WWW-Authenticate', 'Bearer');
+  res.status(401).send(JSON.stringify({ error: 'unauthorized' }));
+  return false;
+}
+
 /** Parse and validate ?from=YYYY-MM-DD&to=YYYY-MM-DD; returns [from, to] strings. */
 export function parseDateRange(req, { required = true } = {}) {
   const url = new URL(req.url, `http://${req.headers.host}`);

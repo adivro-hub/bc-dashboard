@@ -11,7 +11,7 @@
  *     income_structure: { … per view … }   // populated once views exist
  *   }
  */
-import { query, ok, bad } from './_db.js';
+import { query, ok, bad, requireAuth } from './_db.js';
 
 const INCOME_VIEWS = [
   'income_structure_vat',
@@ -24,6 +24,7 @@ const INCOME_VIEWS = [
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
+  if (!requireAuth(req, res)) return;
 
   try {
     // to_char(..., 'YYYY-MM-DD') keeps dates as plain strings so the
