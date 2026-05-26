@@ -77,10 +77,24 @@ export default async function handler(req, res) {
         ORDER BY "Fleet"`,
       [from, to]
     );
+    // Driver-hours items need BOTH a `.jobs` and `.hours` field set to
+    // the hours total. The legacy XLS pipeline reused the "jobs" slot
+    // for the hours number (column-position reuse in the source XLS),
+    // so the bar/table widget reads `.jobs` while the hours-per-job
+    // computation reads `.hours`. Setting both keeps every consumer
+    // happy without touching dashboard.js. Other metric slots stay 0
+    // so any rendering that sums them doesn't break.
     const driver_hours = {};
     for (const r of hourRows) {
       if (!r.k) continue;
-      driver_hours[r.k] = { hours: r.hours };
+      driver_hours[r.k] = {
+        jobs:        r.hours,
+        hours:       r.hours,
+        without_vat: 0,
+        vat:         0,
+        total:       0,
+        earnings:    0,
+      };
     }
     sections.driver_hours = driver_hours;
 
