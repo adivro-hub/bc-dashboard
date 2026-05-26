@@ -23,8 +23,11 @@ export function pool() {
   }
   _pool = new Pool({
     connectionString: conn,
-    // Neon pooler already multiplexes; small per-container pool is enough.
-    max: 3,
+    // Neon's pooler endpoint already multiplexes connections server-side,
+    // but the local node-pg pool also acts as a concurrency gate: Promise.all
+    // of N queries can only run min(N, max) in parallel. Bumped to 10 so
+    // /api/coverage's 9 parallel queries fan out in a single batch.
+    max: 10,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 8_000,
   });

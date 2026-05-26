@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       if (r.name) account_names[r.account_no] = r.name;
     }
     ok(res, { count: rows.length, account_names },
-       { cache: 'public, max-age=600, must-revalidate' });
+       { cache: 'public, max-age=600, s-maxage=600, must-revalidate' });
   } catch (e) {
     console.error(e);
     bad(res, 500, e.message || 'account-names query failed');

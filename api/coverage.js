@@ -1,15 +1,20 @@
 /* GET /api/coverage
  *
- * Returns what date ranges and row counts are present in each table.
- * Lets the dashboard show the date picker bounds without loading any rows,
- * and replaces the per-section metadata calls that today go to Supabase.
+ * Returns what date ranges and row counts are present in each table,
+ * for the dashboard's coverage chip + period bounds.
  *
  * Response shape:
  *   {
- *     jobs:         { rows, date_min, date_max },
- *     registrations:{ rows, created_min, created_max },
- *     income_structure: { … per view … }   // populated once views exist
+ *     jobs:             { rows, date_min, date_max },
+ *     registrations:    { rows, created_min, created_max },
+ *     hours:            { rows, date_min, date_max },
+ *     income_structure: { <view>: { rows, date_min, date_max | error }, ... }
  *   }
+ *
+ * All 9 queries run in parallel (pg pool max=10) so total latency is
+ * roughly one round-trip to Neon plus the slowest individual query
+ * instead of the sum. Response is cached at the CDN for 5 min — the
+ * underlying counts only change after a sync run.
  */
 import { query, ok, bad, requireAuth } from './_db.js';
 
@@ -22,66 +27,49 @@ const INCOME_VIEWS = [
   'income_structure_login_time',
 ];
 
+// One generic count + min/max query per table. Wrapped in try so a
+// missing-table error degrades that entry without taking out the rest
+// of the response (used to be the income views; now they all exist but
+// the safety net is cheap).
+async function probeTable(table, dateExpr, { isTimestamp = false } = {}) {
+  const fmt = isTimestamp
+    ? `'YYYY-MM-DD"T"HH24:MI:SSOF'`
+    : `'YYYY-MM-DD'`;
+  try {
+    const [r] = await query(
+      `SELECT COUNT(*)::int AS rows,
+              to_char(MIN(${dateExpr}), ${fmt}) AS date_min,
+              to_char(MAX(${dateExpr}), ${fmt}) AS date_max
+       FROM ${table}`
+    );
+    return r;
+  } catch (e) {
+    return { rows: 0, date_min: null, date_max: null, error: e.code || 'missing' };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return bad(res, 405, 'GET only');
   if (!await requireAuth(req, res)) return;
 
   try {
-    // to_char(..., 'YYYY-MM-DD') keeps dates as plain strings so the
-    // pg driver doesn't convert them to UTC midnight Date objects
-    // (which would shift e.g. 2025-01-01 to 2024-12-31T22:00:00Z in
-    // a UTC+2 locale and confuse the frontend).
-    const [jobRow] = await query(
-      `SELECT COUNT(*)::int                            AS rows,
-              to_char(MIN(job_date), 'YYYY-MM-DD')     AS date_min,
-              to_char(MAX(job_date), 'YYYY-MM-DD')     AS date_max
-       FROM job_analogue`
-    );
-    const [regRow] = await query(
-      `SELECT COUNT(*)::int                                  AS rows,
-              to_char(MIN(created_at), 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_min,
-              to_char(MAX(created_at), 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_max
-       FROM registrations`
-    );
+    const [jobs, regsRaw, hours, ...incomes] = await Promise.all([
+      probeTable('job_analogue',   'job_date'),
+      probeTable('registrations',  'created_at', { isTimestamp: true }),
+      probeTable('hour_statistics','date'),
+      ...INCOME_VIEWS.map(v => probeTable(v, '"Date"')),
+    ]);
 
-    // Hour Statistics mirror — same gentle handling as income views in
-    // case it's missing on an older deploy where the table hasn't been
-    // created yet.
-    let hours = { rows: 0, date_min: null, date_max: null };
-    try {
-      const [r] = await query(
-        `SELECT COUNT(*)::int                          AS rows,
-                to_char(MIN(date), 'YYYY-MM-DD')       AS date_min,
-                to_char(MAX(date), 'YYYY-MM-DD')       AS date_max
-         FROM hour_statistics`
-      );
-      hours = r;
-    } catch (e) {
-      hours.error = e.code || 'missing';
-    }
+    // Frontend reads created_min / created_max; rename for stable contract.
+    const registrations = regsRaw.error
+      ? regsRaw
+      : { rows: regsRaw.rows, created_min: regsRaw.date_min, created_max: regsRaw.date_max };
 
-    // Income structure views may not exist yet — query gracefully.
-    const income = {};
-    for (const v of INCOME_VIEWS) {
-      try {
-        const [r] = await query(
-          `SELECT COUNT(*)::int                          AS rows,
-                  to_char(MIN("Date"), 'YYYY-MM-DD')     AS date_min,
-                  to_char(MAX("Date"), 'YYYY-MM-DD')     AS date_max
-           FROM ${v}`
-        );
-        income[v] = r;
-      } catch (e) {
-        income[v] = { error: e.code || 'missing' };
-      }
-    }
+    const income_structure = {};
+    INCOME_VIEWS.forEach((v, i) => { income_structure[v] = incomes[i]; });
 
-    ok(res, {
-      jobs: jobRow,
-      registrations: regRow,
-      hours,
-      income_structure: income,
-    }, { cache: 'public, max-age=60, must-revalidate' });
+    ok(res, { jobs, registrations, hours, income_structure },
+       { cache: 'public, max-age=300, s-maxage=300, must-revalidate' });
   } catch (e) {
     console.error(e);
     bad(res, 500, e.message || 'query failed');
