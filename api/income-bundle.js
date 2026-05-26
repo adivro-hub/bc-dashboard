@@ -38,7 +38,11 @@ export default async function handler(req, res) {
 
   try {
     // For each category view: SUM the 5 measures per category label,
-    // restricted to the date window.
+    // restricted to the date window. The source views emit a literal
+    // "Total" row per day that's a pre-computed rollup of the other
+    // categories — excluding it here prevents the dashboard from both
+    // (a) rendering a redundant "Total" bar/donut slice and (b)
+    // double-counting in the KPI sum below.
     const sections = {};
     for (const { table, key, label } of SECTION_MAP) {
       const rows = await query(
@@ -50,6 +54,8 @@ export default async function handler(req, res) {
                 COALESCE(SUM("Earnings"),   0)::float AS earnings
            FROM ${table}
           WHERE "Date" BETWEEN $1::date AND $2::date
+            AND "${label}" IS NOT NULL
+            AND lower(trim("${label}")) <> 'total'
           GROUP BY "${label}"
           ORDER BY "${label}"`,
         [from, to]
@@ -69,10 +75,13 @@ export default async function handler(req, res) {
     }
 
     // driver_hours = fleet-keyed login_time totals (no Tax/Earnings cols).
+    // Skip any "Total" rollup row for the same reason as above.
     const hourRows = await query(
       `SELECT "Fleet" AS k, COALESCE(SUM("Hours"), 0)::float AS hours
          FROM income_structure_login_time
         WHERE "Date" BETWEEN $1::date AND $2::date
+          AND "Fleet" IS NOT NULL
+          AND lower(trim("Fleet")) <> 'total'
         GROUP BY "Fleet"
         ORDER BY "Fleet"`,
       [from, to]
@@ -98,9 +107,8 @@ export default async function handler(req, res) {
     }
     sections.driver_hours = driver_hours;
 
-    // KPIs roll-up = sum across the Sales (VAT) view's rows. Avoid using
-    // payment_type / grade / etc. because some categorisations double-count
-    // (e.g. a job tagged in both with-VAT and a Grade).
+    // KPIs roll-up = sum across the Sales (VAT) view's rows, with the
+    // "Total" rollup row excluded so we don't double-count.
     const [kpiRow] = await query(
       `SELECT COALESCE(SUM("Jobs"),       0)::float AS jobs,
               COALESCE(SUM("WithoutTax"), 0)::float AS without_vat,
@@ -108,7 +116,9 @@ export default async function handler(req, res) {
               COALESCE(SUM("Total"),      0)::float AS total,
               COALESCE(SUM("Earnings"),   0)::float AS earnings
          FROM income_structure_vat
-        WHERE "Date" BETWEEN $1::date AND $2::date`,
+        WHERE "Date" BETWEEN $1::date AND $2::date
+          AND "Sales" IS NOT NULL
+          AND lower(trim("Sales")) <> 'total'`,
       [from, to]
     );
     const kpis = {
