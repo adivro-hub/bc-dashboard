@@ -107,6 +107,13 @@ async function loadIncomeForRange(from, to){
   return getJson(`/api/income-bundle?from=${from}&to=${to}`);
 }
 
+// Hours: vehicle-state counts per hour (driver telemetry) joined with
+// per-hour job counts (ASAP/Prebook/Done/Cancelled). Drop-in for what
+// parsers.parseHours() would produce from a Hour Statistics XLS.
+async function loadHoursForRange(from, to){
+  return getJson(`/api/hours-bundle?from=${from}&to=${to}`);
+}
+
 // -----------------------------------------------------------------
 // Metadata (coverage + account_names + synthetic "file" objects)
 //
@@ -157,9 +164,16 @@ async function loadMetadata(progress){
   const regMin = r.created_min ? String(r.created_min).slice(0, 10) : null;
   const regMax = r.created_max ? String(r.created_max).slice(0, 10) : null;
 
+  // Hours mirror is populated incrementally — reflect actual backfill
+  // progress in the coverage chip rather than hide the section.
+  const h = (coverage && coverage.hours) || {};
+  const hours_files = (h.rows && h.date_min)
+    ? synthFile('hours', h.date_min, h.date_max, h.rows)
+    : [];
+
   return {
     income_files: incMin && incMax ? synthFile('income', incMin, incMax, incRows) : [],
-    hours_files:  [],   // wire up once hour_statistics mirror lands
+    hours_files,
     job_files:    j.date_min ? synthFile('jobs', j.date_min, j.date_max, j.rows || 0) : [],
     reg_files:    regMin ? synthFile('registrations', regMin, regMax, r.rows || 0) : [],
     account_names: (names && names.account_names) || {},
@@ -245,7 +259,7 @@ window.BCStore = {
   anonymiseJobRow, anonymiseRegRow,
   // reads
   loadAll, loadMetadata, loadJobRowsForRange, loadRegRowsForRange,
-  loadIncomeForRange,
+  loadIncomeForRange, loadHoursForRange,
 };
 
 })();

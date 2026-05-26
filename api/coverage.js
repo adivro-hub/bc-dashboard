@@ -44,6 +44,22 @@ export default async function handler(req, res) {
        FROM registrations`
     );
 
+    // Hour Statistics mirror — same gentle handling as income views in
+    // case it's missing on an older deploy where the table hasn't been
+    // created yet.
+    let hours = { rows: 0, date_min: null, date_max: null };
+    try {
+      const [r] = await query(
+        `SELECT COUNT(*)::int                          AS rows,
+                to_char(MIN(date), 'YYYY-MM-DD')       AS date_min,
+                to_char(MAX(date), 'YYYY-MM-DD')       AS date_max
+         FROM hour_statistics`
+      );
+      hours = r;
+    } catch (e) {
+      hours.error = e.code || 'missing';
+    }
+
     // Income structure views may not exist yet — query gracefully.
     const income = {};
     for (const v of INCOME_VIEWS) {
@@ -63,6 +79,7 @@ export default async function handler(req, res) {
     ok(res, {
       jobs: jobRow,
       registrations: regRow,
+      hours,
       income_structure: income,
     }, { cache: 'public, max-age=60, must-revalidate' });
   } catch (e) {
