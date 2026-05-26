@@ -99,6 +99,14 @@ async function loadRegRowsForRange(from, to){
   return fetchAllPaged(`/api/reg-rows?from=${from}&to=${to}`);
 }
 
+// On-demand income aggregation for a date range. Returns the "sections"
+// shape dashboard.js renders: sales / payment_type / customer_grade /
+// service / fleet / driver_hours buckets, each keyed by category name.
+// upload.js prefers this over BCParsers.aggregateIncome() when present.
+async function loadIncomeForRange(from, to){
+  return getJson(`/api/income-bundle?from=${from}&to=${to}`);
+}
+
 // -----------------------------------------------------------------
 // Metadata (coverage + account_names + synthetic "file" objects)
 //
@@ -237,6 +245,7 @@ window.BCStore = {
   anonymiseJobRow, anonymiseRegRow,
   // reads
   loadAll, loadMetadata, loadJobRowsForRange, loadRegRowsForRange,
+  loadIncomeForRange,
 };
 
 })();

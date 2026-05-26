@@ -648,17 +648,22 @@
 
     setStatus('Aggregating…');
 
-    function buildPeriod(from, to){
-      const income = BCParsers.aggregateIncome(STORE.income_files, from, to);
-      const hours  = BCParsers.aggregateHours(STORE.hours_files,   from, to);
-      const jobs   = BCParsers.aggregateJobs(STORE.job_rows,        from, to);
+    async function buildPeriod(from, to){
+      // Prefer the Neon-backed bundle when the new BCStore is in use;
+      // fall back to client-side aggregation from STORE.income_files
+      // (legacy Supabase path).
+      const income = window.BCStore && window.BCStore.loadIncomeForRange
+        ? await window.BCStore.loadIncomeForRange(from, to)
+        : BCParsers.aggregateIncome(STORE.income_files, from, to);
+      const hours  = BCParsers.aggregateHours(STORE.hours_files, from, to);
+      const jobs   = BCParsers.aggregateJobs(STORE.job_rows,     from, to);
       const finalIncome = income || synthesiseIncomeFromJobs(jobs, from, to);
       const { otp, kpis } = BCParsers.buildPeriodPayloads(finalIncome, hours, jobs);
       return { income: finalIncome, hours, jobs, otp, kpis };
     }
 
-    const A = buildPeriod(curFrom, curTo);
-    const B = (prevFrom && prevTo) ? buildPeriod(prevFrom, prevTo) : emptyPeriod(prevFrom, prevTo);
+    const A = await buildPeriod(curFrom, curTo);
+    const B = (prevFrom && prevTo) ? await buildPeriod(prevFrom, prevTo) : emptyPeriod(prevFrom, prevTo);
 
     window.__DATA__ = {
       current:  A.income,
