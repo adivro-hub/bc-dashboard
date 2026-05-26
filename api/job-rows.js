@@ -39,6 +39,12 @@ export default async function handler(req, res) {
     Math.max(1, parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT));
 
   try {
+    // phone_hash / vehicle_hash mirror the Supabase anonymisation:
+    // SHA-256 of the normalised string (lower-trim for vehicle reg,
+    // digits-only for telephone). The top-clients widget keys retail
+    // customers by phone hash; vehicle hash is included for symmetry
+    // with the legacy schema. Empty inputs hash to NULL, not a blank
+    // string, so the isRetail filter (phone !== "") rejects them.
     const rows = await query(
       `SELECT
          to_char(job_date, 'YYYY-MM-DD') AS date,
@@ -54,7 +60,19 @@ export default async function handler(req, res) {
               ELSE (EXTRACT(EPOCH FROM response_time) / 60.0)::float END AS response_min,
          (pick_up   ~* $3) AS is_otp_pickup,
          (drop_off  ~* $3) AS is_otp_dropoff,
-         (cancel_reason ~* $4) AS is_no_supply_cancel
+         (cancel_reason ~* $4) AS is_no_supply_cancel,
+         CASE
+           WHEN passenger_telephone IS NULL OR passenger_telephone = '' THEN NULL
+           ELSE encode(
+                  digest(
+                    regexp_replace(passenger_telephone, '\\D', '', 'g'),
+                    'sha256'),
+                  'hex')
+         END AS phone_hash,
+         CASE
+           WHEN vehicle_reg_number IS NULL OR trim(vehicle_reg_number) = '' THEN NULL
+           ELSE encode(digest(lower(trim(vehicle_reg_number)), 'sha256'), 'hex')
+         END AS vehicle_hash
        FROM job_analogue
        WHERE job_date BETWEEN $1::date AND $2::date
        ORDER BY job_date ASC, job_number ASC

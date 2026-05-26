@@ -26,8 +26,13 @@ export default async function handler(req, res) {
     Math.max(1, parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT));
 
   try {
+    // file_id is a constant string matching the synth reg_files
+    // entry id ("registrations-neon") in shared_store_neon.js. The
+    // legacy upload.js buckets rows by file_id; with Neon we have a
+    // single synthetic "file" covering everything, so all rows share it.
     const rows = await query(
       `SELECT
+         'registrations-neon'::text AS file_id,
          to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
          COALESCE(status, '') AS status,
          encode(digest(lower(trim(email)), 'sha256'), 'hex') AS email_hash
