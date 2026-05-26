@@ -96,7 +96,12 @@
   </div>
 </div>
 
-<div class="wrap" id="upload-wrap">
+<!-- upload-wrap is permanently hidden in the Neon-backed flow. The
+     picker-bar inputs inside it are kept as the data-flow source of
+     truth (overlay writes into them, generate() reads from them), but
+     the entire section never renders. The "Change period" + "Refresh"
+     buttons in the dashboard header replace the visible controls. -->
+<div class="wrap" id="upload-wrap" style="display:none" hidden>
   <header>
     <h1>BC Operations Dashboard</h1>
     <div class="sub" id="introText">
@@ -150,7 +155,13 @@
 
 <div class="wrap">
   <header>
-    <h1>Operations Dashboard — Period Comparison</h1>
+    <div class="dash-header-top">
+      <h1>Operations Dashboard — Period Comparison</h1>
+      <div class="dash-header-actions">
+        <button id="changePeriod" class="header-btn">Change period</button>
+        <button id="refreshData"  class="header-btn secondary">Refresh data</button>
+      </div>
+    </div>
     <div class="sub" id="periodLine"></div>
     <div class="legend">
       <span><span class="dot" style="background:var(--curr)"></span>Current period</span>

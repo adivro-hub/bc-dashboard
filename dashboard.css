@@ -369,6 +369,24 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
   font-size:16px;
 }
 
+/* Dashboard header toolbar */
+.dash-header-top{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;
+}
+.dash-header-actions{display:flex;gap:8px}
+.header-btn{
+  background:var(--accent);color:#0b1020;border:0;border-radius:8px;
+  padding:8px 16px;font:600 13px system-ui;cursor:pointer;letter-spacing:.2px;
+  transition:filter .15s;
+}
+.header-btn:hover{filter:brightness(1.1)}
+.header-btn.secondary{
+  background:transparent;border:1px solid var(--line);color:var(--text);
+}
+.header-btn.secondary:hover{background:var(--panel-2);filter:none}
+:root[data-theme="light"] .header-btn:not(.secondary){color:#fff}
+
 /* Theme toggle (now lives only in the page footer) */
 .theme-toggle{
   background:transparent;border:1px solid var(--line);

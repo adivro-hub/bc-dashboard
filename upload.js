@@ -611,7 +611,7 @@
     }
   });
 
-  document.getElementById('overlayGenerate')?.addEventListener('click', () => {
+  document.getElementById('overlayGenerate')?.addEventListener('click', async () => {
     const m = document.getElementById('overlayPickerMsg');
     const periods = resolveOverlayPeriods();
     if (!periods || !periods.curFrom || !periods.curTo){
@@ -623,8 +623,49 @@
     document.getElementById('curTo').value    = periods.curTo;
     document.getElementById('prevFrom').value = periods.prevFrom || '';
     document.getElementById('prevTo').value   = periods.prevTo   || '';
-    window._BC_hideOverlay();
-    generate();
+
+    // Show the dashboard area BEFORE generate() runs so the user never
+    // sees the (hidden) upload-wrap. Switch overlay to loading state so
+    // the screen is occupied while rows are being fetched, only close
+    // on success — on failure surface the error in the picker overlay.
+    document.getElementById('dashboard-area').style.display = 'block';
+    window._BC_setOverlayState('loading');
+    const loadingMsg = document.getElementById('loadingMsg');
+    if (loadingMsg) loadingMsg.textContent = 'Building dashboard…';
+    try {
+      await generate();
+      window._BC_hideOverlay();
+    } catch (err) {
+      console.error('generate failed:', err);
+      // Reopen the picker with the error so user can adjust.
+      window._BC_setOverlayState('pickPeriod');
+      const pm = document.getElementById('overlayPickerMsg');
+      if (pm){
+        pm.textContent = 'Could not build dashboard: ' + (err.message || err);
+        pm.className = 'overlay-msg error';
+      }
+    }
+  });
+
+  // "Change period" header button → reopen the period overlay
+  document.getElementById('changePeriod')?.addEventListener('click', () => {
+    showPickPeriodState();
+  });
+  // "Refresh data" header button → re-fetch metadata + rows for current period
+  document.getElementById('refreshData')?.addEventListener('click', async () => {
+    const btn = document.getElementById('refreshData');
+    if (!btn) return;
+    btn.disabled = true; btn.textContent = 'Refreshing…';
+    try {
+      // Drop the cached range marker so loadRowsForRange re-fetches.
+      STORE._lastRangeKey = null;
+      await loadFromStore();
+      await generate();
+    } catch (err) {
+      console.error('refresh failed:', err);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Refresh data';
+    }
   });
 
   // Mirror of applyPreset but writes to the overlay inputs. Re-uses date math.
