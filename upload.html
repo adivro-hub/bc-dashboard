@@ -47,20 +47,43 @@
 
     <!-- STATE: pick periods -->
     <div class="overlay-state" data-state="pickPeriod" hidden>
-      <h1>Pick periods to compare</h1>
+      <h1>Pick a period</h1>
       <p class="overlay-sub" id="overlayCoverage"></p>
 
-      <div class="picker-modal-grid">
-        <div class="picker-modal-card">
-          <div class="picker-modal-label">CURRENT</div>
-          <label>From <input type="date" id="overlayCurFrom" /></label>
-          <label>To &nbsp;&nbsp;<input type="date" id="overlayCurTo" /></label>
+      <div class="period-type-row" id="periodTypeRow" role="tablist">
+        <button type="button" class="period-type-btn active" data-type="weekly"  role="tab">Weekly</button>
+        <button type="button" class="period-type-btn"        data-type="monthly" role="tab">Monthly</button>
+        <button type="button" class="period-type-btn"        data-type="custom"  role="tab">Custom</button>
+      </div>
+
+      <div class="period-panel" data-panel="weekly">
+        <label>Week
+          <select id="weekSelect"></select>
+        </label>
+        <p class="period-hint" id="weekHint"></p>
+      </div>
+
+      <div class="period-panel" data-panel="monthly" hidden>
+        <label>Month
+          <select id="monthSelect"></select>
+        </label>
+        <p class="period-hint" id="monthHint"></p>
+      </div>
+
+      <div class="period-panel" data-panel="custom" hidden>
+        <div class="picker-modal-grid">
+          <div class="picker-modal-card">
+            <div class="picker-modal-label">CURRENT</div>
+            <label>From <input type="date" id="overlayCurFrom" /></label>
+            <label>To &nbsp;&nbsp;<input type="date" id="overlayCurTo" /></label>
+          </div>
+          <div class="picker-modal-card">
+            <div class="picker-modal-label prev">PREVIOUS</div>
+            <label>From <input type="date" id="overlayPrevFrom" /></label>
+            <label>To &nbsp;&nbsp;<input type="date" id="overlayPrevTo" /></label>
+          </div>
         </div>
-        <div class="picker-modal-card">
-          <div class="picker-modal-label prev">PREVIOUS</div>
-          <label>From <input type="date" id="overlayPrevFrom" /></label>
-          <label>To &nbsp;&nbsp;<input type="date" id="overlayPrevTo" /></label>
-        </div>
+        <p class="period-hint">Leaving "previous" blank uses the equal-length window immediately before the current period.</p>
       </div>
 
       <button id="overlayGenerate" class="overlay-cta">View comparison</button>

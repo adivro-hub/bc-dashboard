@@ -270,6 +270,37 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
   .picker-modal-grid{grid-template-columns:1fr}
 }
 
+/* Period-type tabs (Weekly / Monthly / Custom) */
+.period-type-row{
+  display:flex;gap:6px;margin:20px 0 14px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:4px;
+}
+.period-type-btn{
+  flex:1;padding:10px 8px;border:0;border-radius:7px;background:transparent;
+  color:var(--muted);font:600 13px system-ui;cursor:pointer;
+  transition:background .15s, color .15s;
+}
+.period-type-btn:hover{color:var(--text)}
+.period-type-btn.active{
+  background:var(--accent);color:#0b1020;
+}
+
+.period-panel{margin:14px 0 18px;text-align:left}
+.period-panel[hidden]{display:none !important}
+.period-panel > label{
+  display:flex;flex-direction:column;gap:6px;
+  font-size:12px;color:var(--muted);letter-spacing:.3px;font-weight:600;
+  text-transform:uppercase;
+}
+.period-panel select{
+  background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:8px;padding:10px 12px;font:inherit;font-size:14px;
+  cursor:pointer;width:100%;color-scheme:dark;
+}
+.period-hint{
+  font-size:11px;color:var(--muted);margin:10px 2px 0;line-height:1.5;
+}
+
 /* Overlay footer with sign-out + theme toggle, shown on loading + pickPeriod */
 .overlay-footer{
   display:flex;justify-content:center;gap:18px;

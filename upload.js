@@ -174,23 +174,196 @@
     showPickPeriodState();
   }
 
-  // Render the period-picker step in the overlay. Pre-fills inputs from the
-  // suggested defaults (set by suggestDefaultPeriods inside loadFromStore).
+  // -------------------------------------------------------------------
+  // Period-picker overlay: weekly / monthly / custom.
+  // -------------------------------------------------------------------
+  // Anchor for week numbering: data origin. Week 1 = 2025-01-01..2025-01-07
+  // by request, regardless of weekday.
+  const WEEK_ANCHOR = '2025-01-01';
+
+  function addDays(iso, n){
+    const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n);
+    return d.toISOString().slice(0,10);
+  }
+  function dmy(iso){
+    const [y,m,d] = iso.split('-');
+    return `${d}.${m}.${y.slice(2)}`;
+  }
+  function lastDayOfMonth(year, month1){
+    // month1 is 1..12. JS Date: day 0 of next month = last day of this month.
+    return new Date(year, month1, 0).getDate();
+  }
+  const MONTH_NAMES = ['January','February','March','April','May','June',
+                       'July','August','September','October','November','December'];
+
+  function weeksFromRange(coverageTo){
+    if (!coverageTo) return [];
+    const out = [];
+    let n = 1;
+    let from = WEEK_ANCHOR;
+    // Stop at the last week that has any overlap with coverage.
+    while (from <= coverageTo){
+      const to = addDays(from, 6);
+      const partial = to > coverageTo;
+      const effectiveTo = partial ? coverageTo : to;
+      out.push({ n, from, to: effectiveTo, full_to: to, partial });
+      n++;
+      from = addDays(from, 7);
+    }
+    return out;
+  }
+
+  function monthsFromRange(coverageFrom, coverageTo){
+    if (!coverageFrom || !coverageTo) return [];
+    const out = [];
+    let y = parseInt(coverageFrom.slice(0,4), 10);
+    let m = parseInt(coverageFrom.slice(5,7), 10);
+    const endY = parseInt(coverageTo.slice(0,4), 10);
+    const endM = parseInt(coverageTo.slice(5,7), 10);
+    while (y < endY || (y === endY && m <= endM)){
+      const pad = String(m).padStart(2,'0');
+      const lastDay = lastDayOfMonth(y, m);
+      const fromIso = `${y}-${pad}-01`;
+      const fullToIso = `${y}-${pad}-${String(lastDay).padStart(2,'0')}`;
+      const partial = fullToIso > coverageTo;
+      out.push({
+        y, m,
+        from: fromIso,
+        to:   partial ? coverageTo : fullToIso,
+        full_to: fullToIso,
+        partial,
+      });
+      m++; if (m > 12){ m = 1; y++; }
+    }
+    return out;
+  }
+
+  // Render the period-picker overlay: tabs + selects pre-populated from
+  // current coverage, defaulting to the most recent fully-loaded period.
   function showPickPeriodState(){
     const fromCov = document.getElementById('overlayCoverage');
+    const cov = STORE?.coverage || { from: null, to: null };
     if (fromCov){
-      const cov = STORE?.coverage || { from: null, to: null };
       fromCov.textContent = cov.from
         ? `Data available: ${cov.from} → ${cov.to}`
         : 'No data available yet.';
     }
-    // Copy current sticky-bar dates into the overlay inputs
+
+    // Week select
+    const weeks = weeksFromRange(cov.to);
+    const weekSel = document.getElementById('weekSelect');
+    if (weekSel){
+      weekSel.innerHTML = '';
+      for (const w of weeks){
+        const opt = document.createElement('option');
+        opt.value = String(w.n);
+        opt.dataset.from = w.from;
+        opt.dataset.to   = w.to;
+        opt.textContent  = `Week ${w.n} · ${dmy(w.from)} → ${dmy(w.to)}${w.partial ? ' (partial)' : ''}`;
+        weekSel.appendChild(opt);
+      }
+      // Default to the most recent FULL week, else the last partial.
+      const lastFull = [...weeks].reverse().find(w => !w.partial);
+      const def = lastFull || weeks[weeks.length-1];
+      if (def) weekSel.value = String(def.n);
+      updateWeekHint();
+    }
+
+    // Month select
+    const months = monthsFromRange(cov.from, cov.to);
+    const monSel = document.getElementById('monthSelect');
+    if (monSel){
+      monSel.innerHTML = '';
+      for (const mo of months){
+        const opt = document.createElement('option');
+        const key = `${mo.y}-${String(mo.m).padStart(2,'0')}`;
+        opt.value = key;
+        opt.dataset.from = mo.from;
+        opt.dataset.to   = mo.to;
+        opt.textContent  = `${String(mo.m).padStart(2,'0')}.${mo.y} · ${MONTH_NAMES[mo.m-1]} ${mo.y}${mo.partial ? ' (partial)' : ''}`;
+        monSel.appendChild(opt);
+      }
+      const lastFull = [...months].reverse().find(mo => !mo.partial);
+      const def = lastFull || months[months.length-1];
+      if (def) monSel.value = `${def.y}-${String(def.m).padStart(2,'0')}`;
+      updateMonthHint();
+    }
+
+    // Custom panel — copy sticky-bar dates over as a starting point.
     ['curFrom','curTo','prevFrom','prevTo'].forEach(id => {
       const src = document.getElementById(id);
       const dst = document.getElementById('overlay' + id.charAt(0).toUpperCase() + id.slice(1));
       if (src && dst) dst.value = src.value;
     });
+
     window._BC_setOverlayState('pickPeriod');
+  }
+
+  // Show the "vs previous week" / "vs previous month" line under each select.
+  function updateWeekHint(){
+    const sel = document.getElementById('weekSelect');
+    const hint = document.getElementById('weekHint');
+    if (!sel || !hint) return;
+    const opt = sel.selectedOptions[0];
+    if (!opt){ hint.textContent = ''; return; }
+    const from = opt.dataset.from;
+    const prevFrom = addDays(from, -7);
+    const prevTo   = addDays(from, -1);
+    hint.textContent = `Compared against the previous week: ${dmy(prevFrom)} → ${dmy(prevTo)}`;
+  }
+  function updateMonthHint(){
+    const sel = document.getElementById('monthSelect');
+    const hint = document.getElementById('monthHint');
+    if (!sel || !hint) return;
+    const opt = sel.selectedOptions[0];
+    if (!opt){ hint.textContent = ''; return; }
+    const [y, m] = opt.value.split('-').map(Number);
+    let py = y, pm = m - 1; if (pm === 0){ pm = 12; py--; }
+    const ppad = String(pm).padStart(2,'0');
+    const lastDay = lastDayOfMonth(py, pm);
+    const prevFrom = `${py}-${ppad}-01`;
+    const prevTo   = `${py}-${ppad}-${String(lastDay).padStart(2,'0')}`;
+    hint.textContent = `Compared against ${MONTH_NAMES[pm-1]} ${py}: ${dmy(prevFrom)} → ${dmy(prevTo)}`;
+  }
+
+  // Resolve the user's overlay selection into { curFrom, curTo, prevFrom, prevTo }.
+  function resolveOverlayPeriods(){
+    const activeBtn = document.querySelector('.period-type-btn.active');
+    const type = activeBtn ? activeBtn.dataset.type : 'weekly';
+    let curFrom, curTo, prevFrom, prevTo;
+
+    if (type === 'weekly'){
+      const opt = document.getElementById('weekSelect')?.selectedOptions?.[0];
+      if (!opt) return null;
+      curFrom = opt.dataset.from;
+      curTo   = opt.dataset.to;
+      // Previous week = 7 days earlier (full week, even if current is partial)
+      prevFrom = addDays(opt.dataset.from, -7);
+      prevTo   = addDays(opt.dataset.from, -1);
+    } else if (type === 'monthly'){
+      const opt = document.getElementById('monthSelect')?.selectedOptions?.[0];
+      if (!opt) return null;
+      const [y, m] = opt.value.split('-').map(Number);
+      curFrom = opt.dataset.from;
+      curTo   = opt.dataset.to;
+      let py = y, pm = m - 1; if (pm === 0){ pm = 12; py--; }
+      const ppad = String(pm).padStart(2,'0');
+      prevFrom = `${py}-${ppad}-01`;
+      prevTo   = `${py}-${ppad}-${String(lastDayOfMonth(py, pm)).padStart(2,'0')}`;
+    } else { // custom
+      curFrom  = document.getElementById('overlayCurFrom').value;
+      curTo    = document.getElementById('overlayCurTo').value;
+      prevFrom = document.getElementById('overlayPrevFrom').value || '';
+      prevTo   = document.getElementById('overlayPrevTo').value   || '';
+      // Auto previous = equal-length window ending the day before curFrom
+      if (curFrom && curTo && (!prevFrom || !prevTo)){
+        const days = Math.max(1, Math.round(
+          (new Date(curTo + 'T12:00:00Z') - new Date(curFrom + 'T12:00:00Z'))/86400000) + 1);
+        prevTo   = addDays(curFrom, -1);
+        prevFrom = addDays(prevTo, -(days-1));
+      }
+    }
+    return { curFrom, curTo, prevFrom, prevTo, type };
   }
   async function signIn(){
     const emailInput = document.getElementById('authEmail');
@@ -363,20 +536,33 @@
       disableMobile: true,          // use flatpickr UI everywhere, not OS native
     });
   }
-  document.getElementById('overlayGenerate')?.addEventListener('click', () => {
-    // Copy overlay inputs back to sticky-bar inputs, then generate + dismiss.
-    ['curFrom','curTo','prevFrom','prevTo'].forEach(id => {
-      const src = document.getElementById('overlay' + id.charAt(0).toUpperCase() + id.slice(1));
-      const dst = document.getElementById(id);
-      if (src && dst) dst.value = src.value;
-    });
-    const cf = document.getElementById('curFrom').value;
-    const ct = document.getElementById('curTo').value;
-    if (!cf || !ct){
+  // Wire period-type tab switching
+  document.querySelectorAll('.period-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.period-type-btn').forEach(b => b.classList.toggle('active', b === btn));
+      const type = btn.dataset.type;
+      document.querySelectorAll('.period-panel').forEach(p => {
+        p.hidden = (p.dataset.panel !== type);
+      });
       const m = document.getElementById('overlayPickerMsg');
-      if (m){ m.textContent = 'Pick the Current period first.'; m.className = 'overlay-msg error'; }
+      if (m){ m.textContent = ''; m.className = 'overlay-msg'; }
+    });
+  });
+  document.getElementById('weekSelect')?.addEventListener('change', updateWeekHint);
+  document.getElementById('monthSelect')?.addEventListener('change', updateMonthHint);
+
+  document.getElementById('overlayGenerate')?.addEventListener('click', () => {
+    const m = document.getElementById('overlayPickerMsg');
+    const periods = resolveOverlayPeriods();
+    if (!periods || !periods.curFrom || !periods.curTo){
+      if (m){ m.textContent = 'Pick a period first.'; m.className = 'overlay-msg error'; }
       return;
     }
+    // Write into the sticky-bar inputs (the source of truth that generate() reads)
+    document.getElementById('curFrom').value  = periods.curFrom;
+    document.getElementById('curTo').value    = periods.curTo;
+    document.getElementById('prevFrom').value = periods.prevFrom || '';
+    document.getElementById('prevTo').value   = periods.prevTo   || '';
     window._BC_hideOverlay();
     generate();
   });
