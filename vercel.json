@@ -20,5 +20,11 @@
         { "key": "Cache-Control", "value": "public, max-age=60, must-revalidate" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/sync-income",
+      "schedule": "0 3 * * *"
+    }
   ]
 }

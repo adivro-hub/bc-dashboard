@@ -13,6 +13,7 @@ import pg from 'pg';
 const { Pool } = pg;
 
 let _pool = null;
+let _sourcePool = null;
 
 export function pool() {
   if (_pool) return _pool;
@@ -34,9 +35,46 @@ export function pool() {
   return _pool;
 }
 
+/**
+ * Connection to the *source* Postgres (Leaseweb, 62.212.86.214) where
+ * data_access.income_structure_* views live. Used for the nightly sync
+ * and for ?fresh=1 bypass on /api/income.
+ *
+ * Requires env var SOURCE_DATABASE_URL. Returns null (not throws) if
+ * unset, so a deploy without it still serves cached data.
+ */
+export function sourcePool() {
+  if (_sourcePool) return _sourcePool;
+  const conn = process.env.SOURCE_DATABASE_URL;
+  if (!conn) return null;
+  _sourcePool = new Pool({
+    connectionString: conn,
+    max: 2,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+    // Source DB serves a self-signed cert. Encryption stays on (so the
+    // password isn't sent in plaintext), but we skip CN/CA validation —
+    // the IP-allowlist is what gives us authenticity here, not PKI.
+    // Neon's pool above is unaffected (it has a properly trusted cert).
+    ssl: { rejectUnauthorized: false },
+  });
+  _sourcePool.on('error', (err) => {
+    console.error('source pg pool error:', err);
+  });
+  return _sourcePool;
+}
+
 /** Run a query and return rows (helper for the common case). */
 export async function query(sql, params = []) {
   const res = await pool().query(sql, params);
+  return res.rows;
+}
+
+/** Same as query() but against the source DB. */
+export async function sourceQuery(sql, params = []) {
+  const p = sourcePool();
+  if (!p) throw new Error('SOURCE_DATABASE_URL is not set');
+  const res = await p.query(sql, params);
   return res.rows;
 }
 
