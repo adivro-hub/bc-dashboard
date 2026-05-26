@@ -39,8 +39,16 @@ window.renderDashboard = function renderDashboard(){
   const fmtInt   = v => Math.round(v||0).toLocaleString('en-US');
   const fmtPct   = v => (v>=0?'+':'') + v.toFixed(1) + '%';
 
+  function daysBetween(a, b){
+    if (!a || !b) return 0;
+    return Math.max(1, Math.round(
+      (new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z'))/86400000) + 1);
+  }
+  const curDays  = daysBetween(cur.period_from,  cur.period_to);
+  const prevDays = daysBetween(prev.period_from, prev.period_to);
   document.getElementById('periodLine').textContent =
-    `Current: ${cur.period_from} → ${cur.period_to}    •    Previous: ${prev.period_from} → ${prev.period_to}`;
+    `Current: ${cur.period_from} → ${cur.period_to} (${curDays} days)`
+    + `    •    Previous: ${prev.period_from} → ${prev.period_to} (${prevDays} days)`;
 
   // ---------- KPI CARDS ----------
   const kpiDefs = [

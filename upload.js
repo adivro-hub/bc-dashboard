@@ -316,30 +316,26 @@
   // small "Choose a different previous period" link).
   // -------------------------------------------------------------------
 
+  // Days inclusive between two YYYY-MM-DD strings.
+  function daysInclusive(fromIso, toIso){
+    return Math.max(1, Math.round(
+      (new Date(toIso + 'T12:00:00Z') - new Date(fromIso + 'T12:00:00Z'))/86400000) + 1);
+  }
+
   function autoPreviousFor(periods){
     if (!periods || !periods.curFrom || !periods.curTo) return { from: '', to: '', label: '' };
-    if (periods.type === 'weekly'){
-      const from = addDays(periods.curFrom, -7);
-      const to   = addDays(periods.curFrom, -1);
-      return { from, to, label: `the previous week (${dmy(from)} → ${dmy(to)})` };
-    }
-    if (periods.type === 'monthly'){
-      // Equal-length window ending the day before curFrom so a 28-day
-      // February isn't pitted against a 31-day January. For full-month
-      // current periods this lands on the trailing portion of the
-      // previous month (e.g. Feb 2025 -> 04.01 .. 31.01).
-      const days = Math.max(1, Math.round(
-        (new Date(periods.curTo + 'T12:00:00Z') - new Date(periods.curFrom + 'T12:00:00Z'))/86400000) + 1);
-      const to = addDays(periods.curFrom, -1);
-      const from = addDays(to, -(days-1));
-      return { from, to, label: `the prior ${days} days (${dmy(from)} → ${dmy(to)})` };
-    }
-    // custom
-    const days = Math.max(1, Math.round(
-      (new Date(periods.curTo + 'T12:00:00Z') - new Date(periods.curFrom + 'T12:00:00Z'))/86400000) + 1);
+    // Always equal-length: number of days in the previous period exactly
+    // matches the number of days in the current period. Avoids comparing
+    // a partial week or short month against a longer prior calendar one.
+    const days = daysInclusive(periods.curFrom, periods.curTo);
     const to = addDays(periods.curFrom, -1);
     const from = addDays(to, -(days-1));
-    return { from, to, label: `the prior ${days}-day window (${dmy(from)} → ${dmy(to)})` };
+    const phrase = (
+      periods.type === 'weekly'  ? `the previous ${days} days` :
+      periods.type === 'monthly' ? `the prior ${days} days` :
+                                   `the prior ${days}-day window`
+    );
+    return { from, to, label: `${phrase} (${dmy(from)} → ${dmy(to)})` };
   }
 
   function activePeriodType(){
