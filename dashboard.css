@@ -344,6 +344,31 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 }
 .overlay-footer button:hover, .overlay-footer a:hover{color:var(--text)}
 
+/* Minimum 16px font size everywhere inside the overlay — prevents
+   mobile browsers from auto-zooming on focused inputs and improves
+   readability of the small labels/hints. Listed near the end so it
+   wins over the smaller sizes set by the individual rules above. */
+.overlay .overlay-brand,
+.overlay .overlay-sub,
+.overlay .overlay-msg,
+.overlay-card.sent .overlay-msg,
+.overlay .overlay-form input,
+.overlay .overlay-form button,
+.overlay .overlay-cta,
+.overlay .picker-modal-label,
+.overlay .picker-modal-card label,
+.overlay .picker-modal-card input,
+.overlay .picker-modal-card select,
+.overlay .period-type-btn,
+.overlay .period-panel > label,
+.overlay .period-panel select,
+.overlay .period-hint,
+.overlay .overlay-footer,
+.overlay .overlay-footer button,
+.overlay .overlay-footer a{
+  font-size:16px;
+}
+
 /* Theme toggle (now lives only in the page footer) */
 .theme-toggle{
   background:transparent;border:1px solid var(--line);
