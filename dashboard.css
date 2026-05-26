@@ -27,6 +27,28 @@
   background:#0b1020;
   color:#ffffff;
 }
+/* Light theme: replace the yellow accent on TEXT usages with neutral
+   black/grey. The accent itself stays yellow for backgrounds (buttons),
+   borders (focus rings, drop-zone hover) and the chart-axis highlight,
+   so the brand colour still shows where it doesn't impair readability. */
+:root[data-theme="light"] .filter h4 .count,
+:root[data-theme="light"] #files-list .kind{
+  color:var(--text);
+}
+:root[data-theme="light"] .overlay-brand,
+:root[data-theme="light"] .picker-bar .picker-label,
+:root[data-theme="light"] .picker-modal-label,
+:root[data-theme="light"] #authBar .role{
+  color:var(--muted);
+}
+:root[data-theme="light"] .picker-modal-label.prev,
+:root[data-theme="light"] .picker-bar .picker-label.prev{
+  color:var(--prev);  /* leave the "PREVIOUS" labels in their amber tint */
+}
+:root[data-theme="light"] .prev-override-link{
+  color:var(--text);text-decoration:underline;
+}
+
 :root[data-theme="light"] .overlay-form button:hover:not(:disabled),
 :root[data-theme="light"] .overlay-cta:hover,
 :root[data-theme="light"] .picker-bar .picker-go:hover:not(:disabled),
