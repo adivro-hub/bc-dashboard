@@ -129,19 +129,28 @@ async function syncOne(neonClient, v) {
   await neonClient.query(ensureTableSql(v));
   await neonClient.query('BEGIN');
   try {
-    await neonClient.query(`TRUNCATE TABLE ${v.target}`);
     const sourceRows = await sourcePool().query(
       `SELECT ${v.columns.map(c => c[0]).join(', ')} FROM ${v.source}`
     );
     const cols = v.columns.map(c => c[0]).join(', ');
     const placeholders = v.columns.map((_, i) => `$${i + 1}`).join(', ');
-    const insert = `INSERT INTO ${v.target} (${cols}) VALUES (${placeholders})`;
+    // UPSERT (not TRUNCATE+INSERT) so XLS-supplied days for dates the
+    // source DB hasn't caught up to yet aren't wiped on each run.
+    // Whenever source eventually has the data it overwrites the XLS row.
+    const nonPkCols = v.columns
+      .filter(c => !v.pk.includes(c[0]))
+      .map(c => `${c[0]} = EXCLUDED.${c[0]}`)
+      .concat([`synced_at = NOW()`])
+      .join(', ');
+    const upsert =
+      `INSERT INTO ${v.target} (${cols}) VALUES (${placeholders})
+       ON CONFLICT (${v.pk.join(', ')}) DO UPDATE SET ${nonPkCols}`;
     for (const row of sourceRows.rows) {
       const values = v.columns.map(c => {
         const key = c[0].replace(/"/g, '');
         return row[key];
       });
-      await neonClient.query(insert, values);
+      await neonClient.query(upsert, values);
     }
     await neonClient.query('COMMIT');
     return { rows: sourceRows.rows.length, ms: Date.now() - t0 };
