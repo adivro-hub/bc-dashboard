@@ -129,8 +129,16 @@ async function syncOne(neonClient, v) {
   await neonClient.query(ensureTableSql(v));
   await neonClient.query('BEGIN');
   try {
+    // Skip the literal "Total" rollup row the source views emit per
+    // day — those are sums of the other categories and would
+    // double-count downstream. v.pk[1] is the category column (e.g.
+    // "Sales", "PaymentType", "Fleet") since pk[0] is always "Date".
+    const categoryCol = v.pk[1];
     const sourceRows = await sourcePool().query(
-      `SELECT ${v.columns.map(c => c[0]).join(', ')} FROM ${v.source}`
+      `SELECT ${v.columns.map(c => c[0]).join(', ')}
+         FROM ${v.source}
+        WHERE ${categoryCol} IS NOT NULL
+          AND lower(trim(${categoryCol})) <> 'total'`
     );
     const cols = v.columns.map(c => c[0]).join(', ');
     const placeholders = v.columns.map((_, i) => `$${i + 1}`).join(', ');
