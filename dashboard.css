@@ -1,11 +1,13 @@
 :root, :root[data-theme="dark"]{
-  --bg:#0b1020; --panel:#121a33; --panel-2:#0f1730; --line:#1f2a4d;
-  --text:#e6ecff; --muted:#9aa6cf; --accent:#7c9cff;
-  --curr:#7c9cff; --prev:#ffb86b; --good:#3ddc97; --bad:#ff6b8a;
-  --shadow:0 8px 30px rgba(0,0,0,.35);
+  /* Grey palette for chrome, vibrant yellow for highlights. Primary
+     buttons are black/white (set on the button rules below). */
+  --bg:#1f1f1f; --panel:#2b2b2b; --panel-2:#353535; --line:#4a4a4a;
+  --text:#ebebeb; --muted:#a0a0a0; --accent:#f5cc1e;
+  --curr:#f5cc1e; --prev:#ffb86b; --good:#3ddc97; --bad:#ff6b8a;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
   --radius:14px;
-  --picker-bar-bg:rgba(11,16,32,.92);
-  --overlay-bg:rgba(11,16,32,.92);
+  --picker-bar-bg:rgba(31,31,31,.94);
+  --overlay-bg:rgba(15,15,15,.85);
   color-scheme:dark;
 }
 :root[data-theme="light"]{
@@ -92,7 +94,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
 th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right}
 th:first-child,td:first-child{text-align:left}
 thead th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
-tbody tr:hover{background:rgba(124,156,255,.05)}
+tbody tr:hover{background:rgba(245,204,30,.07)}
 .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
 .filter{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px}
 .filter h4{margin:0 0 6px 0;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center}
@@ -108,7 +110,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 .options::-webkit-scrollbar{width:6px}
 .options::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
 .opt{display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:4px;font-size:12px;cursor:pointer}
-.opt:hover{background:rgba(124,156,255,.08)}
+.opt:hover{background:rgba(245,204,30,.10)}
 .opt input{cursor:pointer;accent-color:var(--accent)}
 .opt .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .opt .badge{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
@@ -137,7 +139,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
   background:var(--panel);border:2px dashed var(--line);border-radius:var(--radius);
   padding:18px;text-align:center;cursor:pointer;transition:border-color .15s, background .15s;
 }
-.drop.dragover{border-color:var(--accent);background:rgba(124,156,255,.08)}
+.drop.dragover{border-color:var(--accent);background:rgba(245,204,30,.10)}
 .drop.ok{border-color:var(--good);border-style:solid;background:rgba(61,220,151,.06)}
 .drop h3{margin:0 0 6px 0;font-size:14px}
 .drop p{margin:4px 0;font-size:12px;color:var(--muted)}
@@ -168,7 +170,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 }
 .picker-bar select{cursor:pointer;max-width:170px}
 .picker-bar .picker-go{
-  background:var(--accent);color:#0b1020;border:0;border-radius:6px;
+  background:#000;color:#fff;border:0;border-radius:6px;
   padding:7px 16px;font:700 12px system-ui;cursor:pointer;letter-spacing:.3px;
 }
 .picker-bar .picker-go:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
@@ -188,7 +190,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 
 .actions{display:flex;gap:12px;align-items:center;margin-top:18px;flex-wrap:wrap}
 .actions button{
-  background:var(--accent);color:#0b1020;border:0;border-radius:8px;padding:10px 18px;
+  background:#000;color:#fff;border:0;border-radius:8px;padding:10px 18px;
   font:700 13px system-ui;cursor:pointer;letter-spacing:.3px;
 }
 .actions button:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
@@ -206,7 +208,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 /* ---- Auth overlay (pre-login) ---- */
 .overlay{
   position:fixed;inset:0;z-index:1000;
-  background:radial-gradient(circle at 30% 20%, rgba(124,156,255,.08), transparent 50%),
+  background:radial-gradient(circle at 30% 20%, rgba(245,204,30,.10), transparent 50%),
               var(--overlay-bg);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   display:grid;place-items:center;padding:24px;
@@ -216,7 +218,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 .overlay-card{
   background:var(--panel);border:1px solid var(--line);border-radius:18px;
   padding:36px 32px;max-width:440px;width:100%;
-  box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(124,156,255,.05);
+  box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.05);
   text-align:center;
 }
 .overlay-brand{
@@ -235,7 +237,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 }
 .overlay-form input[type=email]:focus{outline:none;border-color:var(--accent)}
 .overlay-form button{
-  background:var(--accent);color:#0b1020;border:0;border-radius:10px;
+  background:#000;color:#fff;border:0;border-radius:10px;
   padding:12px 18px;font:700 13px system-ui;cursor:pointer;letter-spacing:.3px;
   transition:filter .15s;
 }
@@ -284,7 +286,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 }
 .picker-modal-card select{margin-top:4px;cursor:pointer}
 .overlay-cta{
-  background:var(--accent);color:#0b1020;border:0;border-radius:10px;
+  background:#000;color:#fff;border:0;border-radius:10px;
   padding:13px 28px;font:700 14px system-ui;cursor:pointer;letter-spacing:.3px;
   width:100%;margin-top:4px;transition:filter .15s;
 }
@@ -305,7 +307,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 }
 .period-type-btn:hover{color:var(--text)}
 .period-type-btn.active{
-  background:var(--accent);color:#0b1020;
+  background:#000;color:#fff;
 }
 
 .period-panel{margin:14px 0 18px;text-align:left}
@@ -376,7 +378,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 }
 .dash-header-actions{display:flex;gap:8px}
 .header-btn{
-  background:var(--accent);color:#0b1020;border:0;border-radius:8px;
+  background:#000;color:#fff;border:0;border-radius:8px;
   padding:8px 16px;font:600 13px system-ui;cursor:pointer;letter-spacing:.2px;
   transition:filter .15s;
 }
@@ -422,7 +424,7 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
   border-radius:6px;padding:5px 8px;font-family:inherit;font-size:12px;width:240px;
 }
 #authBar button{
-  background:var(--accent);color:#0b1020;border:0;border-radius:6px;
+  background:#000;color:#fff;border:0;border-radius:6px;
   padding:5px 12px;font:600 11px system-ui;cursor:pointer;
 }
 #authBar button.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
