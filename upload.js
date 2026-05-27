@@ -287,6 +287,30 @@
       if (def) monSel.value = `${def.y}-${String(def.m).padStart(2,'0')}`;
     }
 
+    // YoY select: same months list, but only the ones where the
+    // previous-year equivalent ALSO has data in the coverage range.
+    // Otherwise the comparison shows zeros.
+    const yoySel = document.getElementById('yoySelect');
+    if (yoySel){
+      yoySel.innerHTML = '';
+      const covFrom = cov.from || '0000-01-01';
+      for (const mo of months){
+        const prevFrom = `${mo.y - 1}-${String(mo.m).padStart(2,'0')}-01`;
+        // Skip months whose previous-year equivalent isn't in coverage.
+        if (prevFrom < covFrom) continue;
+        const opt = document.createElement('option');
+        const key = `${mo.y}-${String(mo.m).padStart(2,'0')}`;
+        opt.value = key;
+        opt.dataset.from = mo.from;
+        opt.dataset.to   = mo.to;
+        opt.textContent  = `${String(mo.m).padStart(2,'0')}.${mo.y} · ${MONTH_NAMES[mo.m-1]} ${mo.y}${mo.partial ? ' (partial)' : ''}`;
+        yoySel.appendChild(opt);
+      }
+      // Default to the most recent month that has a YoY counterpart.
+      const lastY = yoySel.options[yoySel.options.length - 1];
+      if (lastY) yoySel.value = lastY.value;
+    }
+
     // Custom panel — copy sticky-bar dates over as a starting point.
     ['curFrom','curTo','prevFrom','prevTo'].forEach(id => {
       const src = document.getElementById(id);
@@ -324,9 +348,18 @@
 
   function autoPreviousFor(periods){
     if (!periods || !periods.curFrom || !periods.curTo) return { from: '', to: '', label: '' };
-    // Always equal-length: number of days in the previous period exactly
-    // matches the number of days in the current period. Avoids comparing
-    // a partial week or short month against a longer prior calendar one.
+    // YoY: same calendar month one year earlier. We keep the day numbers
+    // identical, so a 28-day Feb 2026 -> 28-day Feb 2025; only effect is
+    // an off-by-one shift when current ends on Feb 29 (rare).
+    if (periods.type === 'yoy'){
+      const from = `${parseInt(periods.curFrom.slice(0,4), 10) - 1}${periods.curFrom.slice(4)}`;
+      const to   = `${parseInt(periods.curTo.slice(0,4),   10) - 1}${periods.curTo.slice(4)}`;
+      return { from, to, label: `the same month last year (${dmy(from)} → ${dmy(to)})` };
+    }
+    // Weekly / Monthly / Custom: always equal-length. Number of days in
+    // the previous period exactly matches the number of days in the
+    // current period. Avoids pitting a partial week against a full one,
+    // or a 28-day February against a 31-day January.
     const days = daysInclusive(periods.curFrom, periods.curTo);
     const to = addDays(periods.curFrom, -1);
     const from = addDays(to, -(days-1));
@@ -354,6 +387,11 @@
     }
     if (type === 'monthly'){
       const opt = document.getElementById('monthSelect')?.selectedOptions?.[0];
+      if (!opt) return null;
+      return { type, curFrom: opt.dataset.from, curTo: opt.dataset.to };
+    }
+    if (type === 'yoy'){
+      const opt = document.getElementById('yoySelect')?.selectedOptions?.[0];
       if (!opt) return null;
       return { type, curFrom: opt.dataset.from, curTo: opt.dataset.to };
     }
@@ -581,6 +619,7 @@
   });
   document.getElementById('weekSelect')?.addEventListener('change', updatePrevHint);
   document.getElementById('monthSelect')?.addEventListener('change', updatePrevHint);
+  document.getElementById('yoySelect')?.addEventListener('change', updatePrevHint);
   // Custom-tab inputs: keep the auto-previous hint in sync as user types.
   ['overlayCurFrom','overlayCurTo'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', updatePrevHint);

@@ -332,6 +332,13 @@ tbody tr:hover{background:rgba(245,204,30,.07)}
 }
 .prev-override-link:hover{text-decoration:underline}
 .prev-override-card{margin:0 0 14px}
+.period-info-icon{
+  display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;
+  border-radius:50%;background:var(--panel-2);color:var(--muted);
+  font-size:12px;cursor:help;margin:0 4px;user-select:none;
+}
+.period-info-icon:hover,
+.period-info-icon:focus{color:var(--text);outline:none}
 
 /* Overlay footer with sign-out + theme toggle, shown on loading + pickPeriod */
 .overlay-footer{
@@ -395,6 +402,38 @@ tbody tr:hover{background:rgba(245,204,30,.07)}
 }
 .header-toggle:hover{color:var(--text)}
 .header-toggle input{margin:0;accent-color:var(--accent);cursor:pointer}
+
+/* Prominent period banner — replaces the small periodLine + legend. */
+.period-banner{
+  display:flex;align-items:stretch;gap:14px;
+  margin:18px 0 8px;flex-wrap:wrap;
+}
+.period-box{
+  flex:1 1 280px;min-width:0;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+  padding:14px 18px;display:flex;flex-direction:column;gap:4px;
+  border-left:4px solid var(--accent);
+}
+.period-box.period-box-prev{border-left-color:var(--prev)}
+.period-tag{
+  font-size:11px;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--muted);font-weight:700;
+}
+.period-dates{
+  font-size:18px;color:var(--text);font-weight:600;
+  letter-spacing:.2px;line-height:1.3;
+}
+.period-meta{
+  font-size:13px;color:var(--muted);font-weight:500;
+}
+.period-vs{
+  align-self:center;font-size:12px;text-transform:uppercase;letter-spacing:.2em;
+  color:var(--muted);font-weight:600;padding:0 4px;
+}
+@media (max-width:560px){
+  .period-vs{display:none}
+  .period-box{flex-basis:100%}
+}
 
 /* Theme toggle (now lives only in the page footer) */
 .theme-toggle{

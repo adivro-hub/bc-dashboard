@@ -44,11 +44,28 @@ window.renderDashboard = function renderDashboard(){
     return Math.max(1, Math.round(
       (new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z'))/86400000) + 1);
   }
+  function fmtDate(iso){
+    if (!iso) return '—';
+    const d = new Date(iso + 'T12:00:00Z');
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
   const curDays  = daysBetween(cur.period_from,  cur.period_to);
   const prevDays = daysBetween(prev.period_from, prev.period_to);
-  document.getElementById('periodLine').textContent =
+
+  // Prominent banner — populated even if elements are missing (legacy DOM).
+  const setText = (id, txt) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = txt;
+  };
+  setText('periodCurRange',  `${fmtDate(cur.period_from)} → ${fmtDate(cur.period_to)}`);
+  setText('periodCurDays',   `${curDays} ${curDays === 1 ? 'day' : 'days'}`);
+  setText('periodPrevRange', `${fmtDate(prev.period_from)} → ${fmtDate(prev.period_to)}`);
+  setText('periodPrevDays',  `${prevDays} ${prevDays === 1 ? 'day' : 'days'}`);
+
+  // Legacy line kept for any caller still relying on it.
+  setText('periodLine',
     `Current: ${cur.period_from} → ${cur.period_to} (${curDays} days)`
-    + `    •    Previous: ${prev.period_from} → ${prev.period_to} (${prevDays} days)`;
+    + `    •    Previous: ${prev.period_from} → ${prev.period_to} (${prevDays} days)`);
 
   // ---------- KPI CARDS ----------
   const kpiDefs = [

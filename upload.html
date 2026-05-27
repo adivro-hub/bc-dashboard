@@ -53,6 +53,7 @@
       <div class="period-type-row" id="periodTypeRow" role="tablist">
         <button type="button" class="period-type-btn active" data-type="weekly"  role="tab">Weekly</button>
         <button type="button" class="period-type-btn"        data-type="monthly" role="tab">Monthly</button>
+        <button type="button" class="period-type-btn"        data-type="yoy"     role="tab">YoY</button>
         <button type="button" class="period-type-btn"        data-type="custom"  role="tab">Custom</button>
       </div>
 
@@ -68,6 +69,12 @@
         </label>
       </div>
 
+      <div class="period-panel" data-panel="yoy" hidden>
+        <label>Month (vs same month, previous year)
+          <select id="yoySelect"></select>
+        </label>
+      </div>
+
       <div class="period-panel" data-panel="custom" hidden>
         <div class="picker-modal-card">
           <div class="picker-modal-label">CURRENT</div>
@@ -78,6 +85,8 @@
 
       <p class="period-hint period-prev-line">
         Will be compared against <span id="prevHintText">—</span>.
+        <span class="period-info-icon" tabindex="0"
+              title="The comparison period always has the same number of days as the current period, so a 28-day February isn't compared against a 31-day January. YoY uses the same calendar month one year earlier instead. You can override with 'Choose a different previous period'.">ⓘ</span>
         <a href="#" id="prevOverrideToggle" class="prev-override-link">Choose a different previous period</a>
       </p>
 
@@ -156,7 +165,7 @@
 <div class="wrap">
   <header>
     <div class="dash-header-top">
-      <h1>Operations Dashboard — Period Comparison</h1>
+      <h1>Operations Dashboard</h1>
       <div class="dash-header-actions">
         <label class="header-toggle">
           <input type="checkbox" id="showNamesToggle" />
@@ -166,16 +175,31 @@
         <button id="refreshData"  class="header-btn secondary">Refresh data</button>
       </div>
     </div>
-    <div class="sub" id="periodLine"></div>
-    <div class="legend">
-      <span><span class="dot" style="background:var(--curr)"></span>Current period</span>
-      <span><span class="dot" style="background:var(--prev)"></span>Previous period</span>
+
+    <!-- Prominent period banner replaces the small periodLine + legend. -->
+    <div class="period-banner" id="periodBanner">
+      <div class="period-box period-box-cur">
+        <div class="period-tag">CURRENT</div>
+        <div class="period-dates" id="periodCurRange">—</div>
+        <div class="period-meta" id="periodCurDays"></div>
+      </div>
+      <div class="period-vs">vs</div>
+      <div class="period-box period-box-prev">
+        <div class="period-tag">PREVIOUS</div>
+        <div class="period-dates" id="periodPrevRange">—</div>
+        <div class="period-meta" id="periodPrevDays"></div>
+      </div>
     </div>
+    <!-- Legacy element kept for fallback (hidden via CSS). -->
+    <div class="sub" id="periodLine" hidden></div>
   </header>
 
   <div id="dashboard-area" style="display:none">
   <div class="tabs" id="tabs">
     <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="income">Income Structure</button>
+    <button data-tab="clients">Top Clients</button>
+    <button data-tab="hours">Hours &amp; Telemetry</button>
     <button data-tab="ops">Operational KPIs</button>
   </div>
 
@@ -198,6 +222,10 @@
       </div>
     </div>
   </div>
+
+  </div><!-- /view-overview -->
+
+  <div class="view" data-view="income">
 
   <h2>Sales composition (current period share %)</h2>
   <div class="grid panels">
@@ -262,6 +290,10 @@
     <table id="tblHoursPerJob"></table>
   </div>
 
+  </div><!-- /view-income -->
+
+  <div class="view" data-view="hours">
+
   <h2>Hour Statistics — Fleet availability vs demand</h2>
   <div class="grid kpis" id="hourKpis"></div>
 
@@ -285,6 +317,10 @@
       <div class="chart-wrap tall"><canvas id="hourPrevChart"></canvas></div>
     </div>
   </div>
+
+  </div><!-- /view-hours -->
+
+  <div class="view" data-view="clients">
 
   <h2>Top 25 Clients</h2>
   <div class="card">
@@ -311,6 +347,10 @@
     <div class="summary-strip" id="topCorpSummary"></div>
     <table id="topCorpTable"></table>
   </div>
+
+  </div><!-- /view-clients -->
+
+  <div class="view" data-view="ops">
 
   <h2>OTP Airport — Pickup &amp; Destination by Service</h2>
   <div class="card">
@@ -386,10 +426,7 @@
 
   <p class="sub" style="margin-top:24px">Source files: Income Structure and Job Analogue exports for the two periods shown above.</p>
 
-  </div><!-- /view-overview -->
-
-  <div class="view" data-view="ops">
-    <h2>Operational KPIs</h2>
+    <h2 style="margin-top:32px">Operational KPIs</h2>
     <p class="sub" style="margin-top:-8px;margin-bottom:18px">
       Current period vs previous period. KPI numbering matches the spec sheet.
       <strong>#3 (Active cars %)</strong> needs a registered-fleet roster we don't have yet —
