@@ -646,6 +646,23 @@
     }
   });
 
+  // Anonymize toggle: when unchecked (default), the dashboard renders
+  // corporate accounts as just their account number. Persisted in
+  // localStorage so the choice survives reloads.
+  const showNamesCb = document.getElementById('showNamesToggle');
+  if (showNamesCb){
+    showNamesCb.checked = (localStorage.getItem('bc-show-names') === 'true');
+    window.BC_showNames = showNamesCb.checked;
+    showNamesCb.addEventListener('change', () => {
+      localStorage.setItem('bc-show-names', String(showNamesCb.checked));
+      window.BC_showNames = showNamesCb.checked;
+      // Re-render with the new setting if we already have data.
+      if (window.renderDashboard && window.__DATA__){
+        try { window.renderDashboard(); } catch (e) { console.error(e); }
+      }
+    });
+  }
+
   // "Change period" header button → reopen the period overlay
   document.getElementById('changePeriod')?.addEventListener('click', () => {
     showPickPeriodState();

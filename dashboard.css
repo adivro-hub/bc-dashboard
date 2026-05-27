@@ -386,6 +386,13 @@ tbody tr:hover{background:rgba(124,156,255,.05)}
 }
 .header-btn.secondary:hover{background:var(--panel-2);filter:none}
 :root[data-theme="light"] .header-btn:not(.secondary){color:#fff}
+.header-toggle{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:13px;color:var(--muted);cursor:pointer;user-select:none;
+  padding:6px 10px;border:1px solid var(--line);border-radius:8px;
+}
+.header-toggle:hover{color:var(--text)}
+.header-toggle input{margin:0;accent-color:var(--accent);cursor:pointer}
 
 /* Theme toggle (now lives only in the page footer) */
 .theme-toggle{

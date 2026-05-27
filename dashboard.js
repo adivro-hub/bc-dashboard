@@ -466,7 +466,11 @@ window.renderDashboard = function renderDashboard(){
       document.getElementById('topCorpSummary'),
       document.getElementById('topCorpTable'),
       TC.corporate,
-      r => r.account_name ? `${r.account_no} — ${r.account_name}` : String(r.account_no)
+      // Anonymise corporate accounts unless the user explicitly enabled
+      // "Show client names" in the header toggle. Default: numbers only.
+      r => (window.BC_showNames && r.account_name)
+            ? `${r.account_no} — ${r.account_name}`
+            : String(r.account_no)
     );
   }
 
@@ -756,7 +760,10 @@ window.renderDashboard = function renderDashboard(){
       render();
     }
 
-    buildFilter('f-account', 'account', accountOpts, v => `${v}${accountMap[v]?' — '+accountMap[v]:''}`);
+    buildFilter('f-account', 'account', accountOpts, v => {
+      const showName = window.BC_showNames && accountMap[v];
+      return showName ? `${v} — ${accountMap[v]}` : String(v);
+    });
     buildFilter('f-urgency', 'urgency', urgencyOpts, v => v);
     buildFilter('f-status',  'status',  statusOpts,  v => v);
     buildFilter('f-hour',    'hour',    hourOpts,    v => String(v).padStart(2,'0')+':00');
