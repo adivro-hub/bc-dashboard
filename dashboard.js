@@ -531,6 +531,133 @@ window.renderDashboard = function renderDashboard(){
     );
   }
 
+  // ---------- CLIENT LTV ----------
+  // Fetch + render the Client LTV tab content. Independent of the
+  // jobs / income data the rest of renderDashboard wired up.
+  renderClientLTV().catch(e => console.error('LTV render failed:', e));
+
+  async function renderClientLTV(){
+    const kpiBox = document.getElementById('ltvKpis');
+    const tbl    = document.getElementById('ltvTable');
+    const pill   = document.getElementById('ltvMatchPill');
+    const note   = document.getElementById('ltvTableNote');
+    const canvas = document.getElementById('ltvCohortChart');
+    if (!kpiBox || !tbl) return;
+
+    let body;
+    try {
+      const r = await fetch('/api/clients/ltv?limit=50&order_by=ltv_180d', { credentials: 'same-origin' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      body = await r.json();
+    } catch (e) {
+      kpiBox.innerHTML = `<div class="card empty-state">Could not load LTV data: ${e.message}</div>`;
+      return;
+    }
+    const s = body.summary;
+    const fmtRon = v => (v || 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' RON';
+    const fmtPct = v => ((v || 0) * 100).toFixed(1) + '%';
+
+    function card(label, value, sub){
+      return `<div class="card kpi">
+        <div class="label">${label}</div>
+        <div class="value num">${value}</div>
+        <div class="prev num muted">${sub || ''}</div>
+      </div>`;
+    }
+    kpiBox.innerHTML =
+      card('Avg LTV 30 days',  fmtRon(s.avg_ltv_30d),  `${s.mature_180d_clients ? s.mature_180d_clients.toLocaleString() : 0} mature clients`) +
+      card('Avg LTV 90 days',  fmtRon(s.avg_ltv_90d),  `median ${fmtRon(s.median_ltv_180d)} (180d)`) +
+      card('Avg LTV 180 days', fmtRon(s.avg_ltv_180d), `top decile ${fmtRon(s.top_decile_ltv_180d)}`) +
+      card('Top LTV 180d',     fmtRon(s.max_ltv_180d), 'highest single client') +
+      card('Total matched',    (s.clients_with_any_match || 0).toLocaleString(), `${(s.registrations_total || 0).toLocaleString()} registrations total`) +
+      card('Match rate',       fmtPct(s.match_rate),   'registrations with ≥1 ride');
+
+    if (pill){
+      pill.textContent = `${body.total_clients_in_filter.toLocaleString()} clients`;
+    }
+    if (note){
+      note.textContent = `Sorted by LTV 180d (descending). Grey rows = not yet mature for that window (registered recently).`;
+    }
+
+    // Table rendering
+    if (!body.clients.length){
+      tbl.innerHTML = '<tbody><tr><td class="empty-state">No clients yet. The cohort table will fill in as the nightly LTV refresh runs.</td></tr></tbody>';
+    } else {
+      const fmtNum  = v => (v == null ? '—' : fmtRon(v));
+      const fmtRds  = v => (v == null || v === 0 ? '—' : String(v));
+      const tag = (mature, value, rides) => {
+        const cell = `${fmtNum(value)} <span class="muted">(${fmtRds(rides)})</span>`;
+        return mature ? cell : `<span class="muted" title="Registered too recently">${cell}</span>`;
+      };
+      let html = `<thead><tr>
+        <th>Client (hash)</th>
+        <th>Registered</th>
+        <th>LTV 30d (rides)</th>
+        <th>LTV 90d (rides)</th>
+        <th>LTV 180d (rides)</th>
+        <th>All-time rides</th>
+        <th>All-time earn</th>
+        <th>Last ride</th>
+      </tr></thead><tbody>`;
+      for (const c of body.clients){
+        html += `<tr>
+          <td><code style="font-size:11px">${c.client_id}…</code></td>
+          <td class="num">${c.registered_at || '—'}</td>
+          <td class="num">${tag(c.mature_30d,  c.ltv_30d,  c.rides_30d)}</td>
+          <td class="num">${tag(c.mature_90d,  c.ltv_90d,  c.rides_90d)}</td>
+          <td class="num">${tag(c.mature_180d, c.ltv_180d, c.rides_180d)}</td>
+          <td class="num">${c.total_rides_all || 0}</td>
+          <td class="num">${fmtRon(c.total_earn_all || 0)}</td>
+          <td class="num muted">${c.last_ride_at || '—'}</td>
+        </tr>`;
+      }
+      html += '</tbody>';
+      tbl.innerHTML = html;
+    }
+
+    // Cohort chart: 3 lines (avg LTV 30d / 90d / 180d) per month.
+    // Faded markers when avg is null (cohort too recent for that window).
+    if (canvas && body.by_cohort_month && body.by_cohort_month.length){
+      const months = body.by_cohort_month;
+      const labels = months.map(m => m.month);
+      const series = (key, color) => ({
+        label: key.replace('avg_ltv_', 'LTV ').replace('d', ' days'),
+        data: months.map(m => m[key]),
+        spanGaps: true,
+        borderColor: color,
+        backgroundColor: color + '20',
+        tension: 0.25,
+        pointRadius: 3,
+      });
+      if (canvas._chart) canvas._chart.destroy();
+      canvas._chart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            series('avg_ltv_30d',  '#7c9cff'),
+            series('avg_ltv_90d',  '#f5cc1e'),
+            series('avg_ltv_180d', '#3ddc97'),
+          ],
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ labels:{ color: TEXT_COLOR } },
+                    tooltip:{ callbacks:{
+                      afterLabel: (ctx) => {
+                        const m = months[ctx.dataIndex];
+                        return `signups: ${m.signups.toLocaleString()} · matched: ${m.matched.toLocaleString()}`;
+                      }
+                    }}},
+          scales:{
+            x:{ ticks:{ color: TEXT_COLOR }, grid:{ color: GRID_COLOR } },
+            y:{ ticks:{ color: TEXT_COLOR, callback: v => v + ' RON' }, grid:{ color: GRID_COLOR } },
+          },
+        }
+      });
+    }
+  }
+
   // ---------- OTP ----------
   const OTP = window.__OTP__;
   if (OTP){

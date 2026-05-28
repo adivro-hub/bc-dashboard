@@ -25,6 +25,10 @@
     {
       "path": "/api/cron/sync-income",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-ltv",
+      "schedule": "30 3 * * *"
     }
   ]
 }
