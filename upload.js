@@ -931,20 +931,33 @@
     const prevTo  = document.getElementById('prevTo').value;
     if (!curFrom || !curTo){ setStatus('Pick a Current period.', 'error'); return; }
 
-    // Lazy fetch: pull only the rows in the selected ranges from Supabase.
-    // We aggregate the requested union once, then filter client-side per period.
+    // Lazy fetch: pull only the rows in the two selected ranges from Neon.
+    // For adjacent ranges (e.g. May 2026 vs Apr 2026) this is barely
+    // different from a single union query. For YoY (May 2026 vs May 2025)
+    // it avoids dragging in the 11 months in between — was the cause of
+    // the "spinner forever" report.
     if (window.BCStore?.enabled){
-      const rangeFrom = (prevFrom && prevFrom < curFrom) ? prevFrom : curFrom;
-      const rangeTo   = (prevTo   && prevTo   > curTo)   ? prevTo   : curTo;
-      // Cache: skip re-fetch if we already pulled this exact union range
-      const cacheKey  = `${rangeFrom}|${rangeTo}`;
+      // Cache key reflects BOTH periods. Cur-only changes also bust it.
+      const cacheKey = `cur:${curFrom}|${curTo}::prev:${prevFrom || ''}|${prevTo || ''}`;
       if (STORE._lastRangeKey !== cacheKey){
         setStatus('Fetching rows for the selected periods…');
         try {
-          const [jobRows, regRows] = await Promise.all([
-            window.BCStore.loadJobRowsForRange(rangeFrom, rangeTo),
-            (STORE.reg_files.length ? window.BCStore.loadRegRowsForRange(rangeFrom, rangeTo) : Promise.resolve([])),
-          ]);
+          const fetchJobs = async () => {
+            const cur = await window.BCStore.loadJobRowsForRange(curFrom, curTo);
+            const prev = (prevFrom && prevTo)
+              ? await window.BCStore.loadJobRowsForRange(prevFrom, prevTo)
+              : [];
+            return cur.concat(prev);
+          };
+          const fetchRegs = async () => {
+            if (!STORE.reg_files.length) return [];
+            const cur = await window.BCStore.loadRegRowsForRange(curFrom, curTo);
+            const prev = (prevFrom && prevTo)
+              ? await window.BCStore.loadRegRowsForRange(prevFrom, prevTo)
+              : [];
+            return cur.concat(prev);
+          };
+          const [jobRows, regRows] = await Promise.all([fetchJobs(), fetchRegs()]);
           STORE.job_rows = jobRows.map(r => ({
             account_no:   r.account_no != null ? String(r.account_no) : '',
             account_name: STORE._accountNames?.[r.account_no] || '',
