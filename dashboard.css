@@ -483,3 +483,87 @@ tbody tr:hover{background:rgba(245,204,30,.07)}
 #authBar button.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
 #authBar button:hover{filter:brightness(1.1)}
 #authBar .mode-hint{margin-left:auto;font-size:11px}
+
+/* =====================================================================
+   Mobile / tablet pass (≤768px tablet portrait + landscape phone,
+   ≤480px portrait phone). Existing rules at 1100/900px already do half
+   the work; this block fills the gaps for narrower viewports.
+   ===================================================================== */
+
+@media (max-width: 768px){
+  /* Page chrome: tighter padding so we keep horizontal room. */
+  .wrap { padding: 16px 12px; }
+
+  /* Dashboard header: title + actions wrap nicely; action row goes full width. */
+  .dash-header-top { gap: 12px; }
+  .dash-header-top h1 { font-size: 22px; line-height:1.25; }
+  .dash-header-actions { width: 100%; }
+
+  /* Tabs row: 5 buttons don't fit on a phone. Scroll horizontally
+     instead of wrapping into a messy two-row stack. */
+  .tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .tabs button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Tables wider than the viewport scroll within their card instead of
+     blowing out the whole page horizontally. Min-width keeps the
+     columns readable; users swipe sideways inside the card. */
+  .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .card table { min-width: 560px; }
+
+  /* Charts: trim height so a card fits within the viewport. */
+  .chart-wrap.tall { height: 320px; }
+}
+
+@media (max-width: 480px){
+  .wrap { padding: 12px 8px; }
+
+  .dash-header-top h1 { font-size: 18px; }
+  .dash-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .header-btn,
+  .header-toggle { width: 100%; justify-content: center; }
+  .header-toggle { text-align: left; }
+
+  /* KPIs: explicit 1-col so 10 cards stack legibly. The auto-fit
+     minmax(190px,1fr) leaves a thin awkward second column on some
+     narrow widths. */
+  .kpis { grid-template-columns: 1fr; }
+
+  /* Operational filters: 1 col on phones (4→2 at 1100, 2→1 here). */
+  .filters { grid-template-columns: 1fr; }
+
+  /* Period-type tabs in the overlay: more breathing room for finger taps. */
+  .period-type-btn { padding: 12px 6px; }
+
+  /* Chart heights: smaller again on portrait phone. */
+  .chart-wrap { height: 240px; }
+  .chart-wrap.tall { height: 260px; }
+}
+
+/* Touch-device polish: make interactive bits at least 44px tall so they
+   pass Apple/Android tap-target guidelines. Targets coarse pointers
+   regardless of viewport width (covers iPad too). */
+@media (hover: none) and (pointer: coarse) {
+  .tabs button,
+  .header-btn,
+  .period-type-btn,
+  .period-type-row label,
+  .picker-modal-card input,
+  .picker-modal-card select { min-height: 44px; }
+  /* Disable hover-only filter brightness so taps don't leave a stuck
+     bright state. */
+  .header-btn:hover,
+  .overlay-cta:hover,
+  .period-type-btn:hover { filter: none; }
+}
