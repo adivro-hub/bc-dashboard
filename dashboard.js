@@ -615,6 +615,35 @@ window.renderDashboard = function renderDashboard(){
       tbl.innerHTML = html;
     }
 
+    // Cohort table (the explicit, exact-numbers view) — sits below the chart.
+    const cohortTable = document.getElementById('ltvCohortTable');
+    if (cohortTable && body.by_cohort_month){
+      const fmtCell = v => v == null ? '<span class="muted">—</span>' : fmtRon(v);
+      let html = `<thead><tr>
+        <th>Cohort</th>
+        <th class="num">Signups</th>
+        <th class="num">Matched</th>
+        <th class="num">Match %</th>
+        <th class="num">Avg LTV 30d</th>
+        <th class="num">Avg LTV 90d</th>
+        <th class="num">Avg LTV 180d</th>
+      </tr></thead><tbody>`;
+      for (const m of body.by_cohort_month){
+        const matchPct = m.signups ? ((m.matched / m.signups) * 100).toFixed(1) + '%' : '—';
+        html += `<tr>
+          <td><strong>${m.month}</strong></td>
+          <td class="num">${(m.signups || 0).toLocaleString()}</td>
+          <td class="num">${(m.matched || 0).toLocaleString()}</td>
+          <td class="num muted">${matchPct}</td>
+          <td class="num">${fmtCell(m.avg_ltv_30d)}</td>
+          <td class="num">${fmtCell(m.avg_ltv_90d)}</td>
+          <td class="num">${fmtCell(m.avg_ltv_180d)}</td>
+        </tr>`;
+      }
+      html += '</tbody>';
+      cohortTable.innerHTML = html;
+    }
+
     // Cohort chart: 3 lines (avg LTV 30d / 90d / 180d) per month.
     // Faded markers when avg is null (cohort too recent for that window).
     if (canvas && body.by_cohort_month && body.by_cohort_month.length){
