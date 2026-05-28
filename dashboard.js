@@ -67,6 +67,41 @@ window.renderDashboard = function renderDashboard(){
     `Current: ${cur.period_from} → ${cur.period_to} (${curDays} days)`
     + `    •    Previous: ${prev.period_from} → ${prev.period_to} (${prevDays} days)`);
 
+  // Freshness indicator: when each dataset was last refreshed.
+  // Pulls synced_at (where available) + max date from /api/coverage.
+  const freshEl = document.getElementById('freshnessLine');
+  if (freshEl){
+    const cov = window.BCCoverage || {};
+    const parts = [];
+    function part(label, dateMax, synced){
+      if (!dateMax) return;
+      let s = `${label}: <strong>${dateMax}</strong>`;
+      if (synced){
+        const d = new Date(synced);
+        const ago = (Date.now() - d.getTime()) / 60000;  // minutes
+        let when;
+        if (ago < 1)        when = 'now';
+        else if (ago < 60)  when = Math.round(ago) + ' min ago';
+        else if (ago < 1440) when = Math.round(ago/60) + ' h ago';
+        else                 when = d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' });
+        s += ` <span class="muted">· refreshed ${when}</span>`;
+      }
+      parts.push(s);
+    }
+    part('Jobs',   (cov.jobs||{}).date_max);
+    part('Regs',   (cov.registrations||{}).created_max ? String(cov.registrations.created_max).slice(0,10) : null);
+    part('Hours',  (cov.hours||{}).date_max,         (cov.hours||{}).synced_at);
+    // Income: pick the freshest synced_at across the 6 mirror tables; cap date is the min(max_date).
+    const income = cov.income_structure || {};
+    const incomeViews = Object.values(income).filter(v => v && !v.error);
+    if (incomeViews.length){
+      const incomeMaxDate = incomeViews.map(v => v.date_max).filter(Boolean).sort().slice(-1)[0];
+      const incomeSynced  = incomeViews.map(v => v.synced_at).filter(Boolean).sort().slice(-1)[0];
+      part('Income', incomeMaxDate, incomeSynced);
+    }
+    freshEl.innerHTML = parts.join('<span class="sep">·</span>');
+  }
+
   // ---------- KPI CARDS ----------
   const kpiDefs = [
     {key:'total',       label:'Total sales (RON)', fmt:fmtMoney},
@@ -421,6 +456,11 @@ window.renderDashboard = function renderDashboard(){
   if (TC){
     function renderTopClients(box, table, payload, labelFn){
       const top = payload.top, ctx = payload.context;
+      if (!top || !top.length){
+        box.innerHTML = '';
+        table.innerHTML = '<tbody><tr><td class="empty-state">Niciun client în această perioadă. Alege un interval mai larg sau verifică datele.</td></tr></tbody>';
+        return;
+      }
       let tcj=0, tpj=0, tct=0, tpt=0, tce=0, tpe=0;
       top.forEach(r=>{ tcj+=r.cur_jobs; tpj+=r.prev_jobs;
         tct+=r.cur_total; tpt+=r.prev_total;

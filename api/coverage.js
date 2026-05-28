@@ -30,16 +30,23 @@ const INCOME_VIEWS = [
 // One generic count + min/max query per table. Wrapped in try so a
 // missing-table error degrades that entry without taking out the rest
 // of the response (used to be the income views; now they all exist but
-// the safety net is cheap).
-async function probeTable(table, dateExpr, { isTimestamp = false } = {}) {
+// the safety net is cheap). Also returns max(synced_at) for the mirror
+// tables that have it, so the dashboard can show freshness ("data
+// refreshed at HH:MM"). Tables without a synced_at column (the raw
+// XLS-ingested ones) report null.
+async function probeTable(table, dateExpr, { isTimestamp = false, hasSyncedAt = true } = {}) {
   const fmt = isTimestamp
     ? `'YYYY-MM-DD"T"HH24:MI:SSOF'`
     : `'YYYY-MM-DD'`;
+  const syncedExpr = hasSyncedAt
+    ? `, to_char(MAX(synced_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS synced_at`
+    : '';
   try {
     const [r] = await query(
       `SELECT COUNT(*)::int AS rows,
               to_char(MIN(${dateExpr}), ${fmt}) AS date_min,
               to_char(MAX(${dateExpr}), ${fmt}) AS date_max
+              ${syncedExpr}
        FROM ${table}`
     );
     return r;
@@ -54,8 +61,10 @@ export default async function handler(req, res) {
 
   try {
     const [jobs, regsRaw, hours, ...incomes] = await Promise.all([
-      probeTable('job_analogue',   'job_date'),
-      probeTable('registrations',  'created_at', { isTimestamp: true }),
+      // job_analogue + registrations have no synced_at column (XLS ingest
+      // doesn't add it). The income mirror tables + hour_statistics do.
+      probeTable('job_analogue',   'job_date',                { hasSyncedAt: false }),
+      probeTable('registrations',  'created_at', { isTimestamp: true, hasSyncedAt: false }),
       probeTable('hour_statistics','date'),
       ...INCOME_VIEWS.map(v => probeTable(v, '"Date"')),
     ]);

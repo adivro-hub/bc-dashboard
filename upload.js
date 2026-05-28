@@ -172,6 +172,16 @@
     // Now move to period-picker state.
     bar.style.display = '';   // ensure chip is ready when overlay closes
     showPickPeriodState();
+
+    // Deep-link: if a #period= hash is present, render straight away
+    // instead of leaving the overlay open. Defers a tick so applyHashSelection
+    // (inside showPickPeriodState) has settled the UI state.
+    if (location.hash && location.hash.length > 1){
+      setTimeout(() => {
+        const btn = document.getElementById('overlayGenerate');
+        if (btn) btn.click();
+      }, 0);
+    }
   }
 
   // -------------------------------------------------------------------
@@ -323,6 +333,9 @@
     const link     = document.getElementById('prevOverrideToggle');
     if (override) override.hidden = true;
     if (link)     link.textContent = 'Choose a different previous period';
+
+    // If the URL hash carries a selection, restore it on top of defaults.
+    if (typeof applyHashSelection === 'function') applyHashSelection();
 
     updatePrevHint();
     window._BC_setOverlayState('pickPeriod');
@@ -649,6 +662,90 @@
     }
   });
 
+  // ----- URL state helpers -----
+  // Hash format examples:
+  //   #weekly=73
+  //   #monthly=2026-05
+  //   #yoy=2026-05
+  //   #custom=2026-05-01..2026-05-26
+  //   #custom=2026-05-01..2026-05-26&prev=2026-04-01..2026-04-30  (override)
+  function selectionToHash(periods){
+    if (!periods || !periods.type) return '';
+    const t = periods.type;
+    if (t === 'weekly'){
+      const sel = document.getElementById('weekSelect');
+      const n = sel?.value;
+      return n ? `weekly=${n}` : '';
+    }
+    if (t === 'monthly'){
+      return `monthly=${periods.curFrom.slice(0,7)}`;
+    }
+    if (t === 'yoy'){
+      return `yoy=${periods.curFrom.slice(0,7)}`;
+    }
+    // custom: serialise both ranges if override is on; else just current
+    let h = `custom=${periods.curFrom}..${periods.curTo}`;
+    const overrideOn = !document.getElementById('prevOverrideBlock')?.hidden;
+    if (overrideOn && periods.prevFrom && periods.prevTo){
+      h += `&prev=${periods.prevFrom}..${periods.prevTo}`;
+    }
+    return h;
+  }
+  function applyHashSelection(){
+    const h = (location.hash || '').replace(/^#/, '');
+    if (!h) return false;
+    const params = Object.fromEntries(h.split('&').map(kv => {
+      const i = kv.indexOf('=');
+      return i < 0 ? [kv, ''] : [kv.slice(0, i), decodeURIComponent(kv.slice(i+1))];
+    }));
+    function activate(type){
+      document.querySelectorAll('.period-type-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.type === type));
+      document.querySelectorAll('.period-panel').forEach(p =>
+        p.hidden = (p.dataset.panel !== type));
+    }
+    if (params.weekly){
+      activate('weekly');
+      const sel = document.getElementById('weekSelect');
+      if (sel){ sel.value = params.weekly; }
+      return true;
+    }
+    if (params.monthly){
+      activate('monthly');
+      const sel = document.getElementById('monthSelect');
+      if (sel){ sel.value = params.monthly; }
+      return true;
+    }
+    if (params.yoy){
+      activate('yoy');
+      const sel = document.getElementById('yoySelect');
+      if (sel){ sel.value = params.yoy; }
+      return true;
+    }
+    if (params.custom){
+      activate('custom');
+      const [from, to] = params.custom.split('..');
+      if (from && to){
+        document.getElementById('overlayCurFrom').value = from;
+        document.getElementById('overlayCurTo').value   = to;
+      }
+      if (params.prev){
+        const [pf, pt] = params.prev.split('..');
+        if (pf && pt){
+          document.getElementById('overlayPrevFrom').value = pf;
+          document.getElementById('overlayPrevTo').value   = pt;
+          // Reveal the override block
+          const block = document.getElementById('prevOverrideBlock');
+          const link  = document.getElementById('prevOverrideToggle');
+          if (block) block.hidden = false;
+          if (link)  link.textContent = 'Use the default previous period';
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
   document.getElementById('overlayGenerate')?.addEventListener('click', async () => {
     const m = document.getElementById('overlayPickerMsg');
     const periods = resolveOverlayPeriods();
@@ -661,6 +758,10 @@
     document.getElementById('curTo').value    = periods.curTo;
     document.getElementById('prevFrom').value = periods.prevFrom || '';
     document.getElementById('prevTo').value   = periods.prevTo   || '';
+
+    // Persist the selection to the URL so a refresh / shared link reopens it.
+    const newHash = selectionToHash(periods);
+    if (newHash) history.replaceState(null, '', '#' + newHash);
 
     // Show the dashboard area BEFORE generate() runs so the user never
     // sees the (hidden) upload-wrap. Switch overlay to loading state so

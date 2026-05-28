@@ -154,6 +154,9 @@ async function loadMetadata(progress){
     getJson('/api/coverage'),
     getJson('/api/account-names'),
   ]);
+  // Stash the raw coverage so the dashboard chrome can render
+  // freshness indicators without re-fetching.
+  window.BCCoverage = coverage;
 
   const j   = coverage.jobs || {};
   const r   = coverage.registrations || {};
