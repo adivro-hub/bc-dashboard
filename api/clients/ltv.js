@@ -46,6 +46,10 @@ export default async function handler(req, res) {
   const regFrom     = url.searchParams.get('registered_from') || null;
   const regTo       = url.searchParams.get('registered_to')   || null;
   const matureOnly  = url.searchParams.get('mature_only') === 'true';
+  // Registration status filter: default 'Current' (real organic signups);
+  // 'all' = include status='New' too (mostly spam batches from Jan/May/Jul
+  // 2025 — only useful for explicit anomaly analysis).
+  const includeNew  = url.searchParams.get('include_new') === 'true';
   const orderBy     = ALLOWED_ORDER[url.searchParams.get('order_by') || 'ltv_180d'] || 'ltv_180d';
   const orderDir    = (url.searchParams.get('order_dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
   const limit       = Math.min(Math.max(parseInt(url.searchParams.get('limit')  || '50', 10) || 50, 1), 500);
@@ -57,15 +61,21 @@ export default async function handler(req, res) {
   if (regTo   && !dateRe.test(regTo))   return bad(res, 400, 'registered_to must be YYYY-MM-DD');
 
   // Build a shared WHERE clause + params for the filtered subset.
-  const where = ['rides_180d >= $1 OR rides_30d >= $1'];
+  const where = ['(rides_180d >= $1 OR rides_30d >= $1)'];
   const params = [minRides];
+  if (!includeNew) where.push(`reg_status = 'Current'`);
   if (regFrom){ params.push(regFrom); where.push(`registered_at >= $${params.length}::date`); }
   if (regTo)  { params.push(regTo);   where.push(`registered_at <  $${params.length}::date + INTERVAL '1 day'`); }
   if (matureOnly) where.push('mature_180d');
-  const whereSql = `WHERE (${where[0]})${where.length > 1 ? ' AND ' + where.slice(1).join(' AND ') : ''}`;
+  const whereSql = `WHERE ${where.join(' AND ')}`;
 
   try {
-    // Summary across the filtered set + match_rate over all registrations.
+    // Status-aware filters for the inline subselects in the summary query.
+    const statusFilterRegInline = includeNew ? '' : `WHERE status = 'Current'`;
+    const statusFilterLtvInline = includeNew ? '' : `WHERE reg_status = 'Current'`;
+
+    // Summary across the filtered set + match_rate over all registrations
+    // honouring the same status filter (so the rate is apples-to-apples).
     const [summaryRow] = await query(
       `WITH filt AS (SELECT * FROM client_ltv ${whereSql})
        SELECT
@@ -79,8 +89,8 @@ export default async function handler(req, res) {
          (SELECT ROUND((PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY ltv_180d))::numeric, 2)
             FROM filt WHERE mature_180d)                                       AS top_decile_ltv_180d,
          (SELECT MAX(ltv_180d)                FROM filt WHERE mature_180d)    AS max_ltv_180d,
-         (SELECT COUNT(*) FROM registrations)::int                            AS registrations_total,
-         (SELECT COUNT(*) FROM client_ltv)::int                               AS clients_with_any_match`,
+         (SELECT COUNT(*) FROM registrations ${statusFilterRegInline})::int    AS registrations_total,
+         (SELECT COUNT(*) FROM client_ltv ${statusFilterLtvInline})::int       AS clients_with_any_match`,
       params
     );
 
@@ -89,13 +99,14 @@ export default async function handler(req, res) {
       : 0;
 
     // Cohort breakdown — monthly buckets from registered_at, average LTV per
-    // window. Includes signups count (from registrations directly) and
-    // matched count (from client_ltv) so the user sees match rate per month.
+    // window. Signups + matched both honour the include_new toggle so the
+    // match rate is apples-to-apples.
     const cohortRows = await query(
       `WITH reg_by_month AS (
          SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
                 COUNT(*)::int AS signups
          FROM registrations
+         ${statusFilterRegInline}
          GROUP BY 1
        ),
        ltv_by_month AS (
@@ -105,6 +116,7 @@ export default async function handler(req, res) {
                 ROUND(AVG(ltv_90d)  FILTER (WHERE mature_90d)::numeric,  2) AS avg_ltv_90d,
                 ROUND(AVG(ltv_180d) FILTER (WHERE mature_180d)::numeric, 2) AS avg_ltv_180d
          FROM client_ltv
+         ${statusFilterLtvInline}
          GROUP BY 1
        )
        SELECT r.month, r.signups,
