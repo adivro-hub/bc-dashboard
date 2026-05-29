@@ -1139,6 +1139,28 @@ window.renderDashboard = function renderDashboard(){
       if (c.proxy_city)     return `Proxy: distinct vehicle plates with pick-up city LIKE "${c.proxy_city}"`;
       return 'Proxy count';
     }
+    function fmtMin(v){ return v == null ? '—' : `${Number(v).toFixed(1)} min`; }
+    // Render one "Avg response — …" row for ASAP or Prebook.
+    function rtRow(label, cur, prev){
+      const cAvg = cur?.avg_min, pAvg = prev?.avg_min;
+      const cN   = cur?.n ?? 0,  pN   = prev?.n ?? 0;
+      const sub = (cN || pN) ? `<span class="muted">(${cN.toLocaleString()} / ${pN.toLocaleString()} done jobs)</span>` : '';
+      return `<tr>
+        <td>${label} <span class="muted" title="Lower is better — avg time from booking to passenger on board for ${label.includes('ASAP')?'ASAP':'PREBOOK'} jobs in this fleet">${sub}</span></td>
+        <td class="num">${fmtMin(cAvg)}</td>
+        <td class="num muted">${fmtMin(pAvg)}</td>
+        ${deltaCellSwapped(cAvg, pAvg)}
+      </tr>`;
+    }
+    // Same shape as deltaCell but green when DOWN (faster = better).
+    function deltaCellSwapped(c, p){
+      if (p == null && c == null) return '<td class="num muted">—</td>';
+      const diff = (c || 0) - (p || 0);
+      const pct  = p ? (diff / p) * 100 : 0;
+      const cls  = Math.abs(diff) < 0.005 ? 'muted' : (diff <= 0 ? 'pos' : 'neg');
+      const arrow = diff <= 0 ? '▼' : '▲';
+      return `<td class="num ${cls}">${arrow} ${(diff>=0?'+':'')}${pct.toFixed(1)}%</td>`;
+    }
     for (const name of fleets){
       const c = curBundle.fleets[name]  || {};
       const p = prevBundle.fleets[name] || {};
@@ -1171,6 +1193,10 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num">${cHpr == null ? '—' : cHpr.toFixed(2)}</td>
                   <td class="num muted">${pHpr == null ? '—' : pHpr.toFixed(2)}</td>
                   ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
+              ${rtRow('Avg response — ASAP',
+                       c.response_time?.asap,    p.response_time?.asap)}
+              ${rtRow('Avg response — Prebook',
+                       c.response_time?.prebook, p.response_time?.prebook)}
               <tr><td>Unique vehicles
                       <span class="muted" title="${proxyTooltip(c)}">(proxy)</span></td>
                   <td class="num">${fmtNum(c.unique_vehicles)}</td>

@@ -107,6 +107,37 @@ export default async function handler(req, res) {
               AND trim(vehicle_reg_number) <> ''`;
       const [vRow] = await query(vSql, [from, to, f.vehicles.value]);
 
+      // 4. Avg response time (minutes) split by urgency, restricted to
+      // DONE jobs with a non-null response_time. Same fleet proxy as
+      // unique_vehicles.
+      const rtSql = f.vehicles.kind === 'services'
+        ? `SELECT upper(urgency) AS urg,
+                  EXTRACT(EPOCH FROM AVG(response_time))/60.0       AS avg_min,
+                  EXTRACT(EPOCH FROM PERCENTILE_CONT(0.5)
+                    WITHIN GROUP (ORDER BY response_time))/60.0     AS median_min,
+                  COUNT(*)::int                                     AS n
+             FROM job_analogue
+            WHERE job_date BETWEEN $1::date AND $2::date
+              AND status = 'DONE'
+              AND response_time IS NOT NULL
+              AND upper(urgency) IN ('ASAP','PREBOOK')
+              AND service = ANY($3::text[])
+            GROUP BY upper(urgency)`
+        : `SELECT upper(urgency) AS urg,
+                  EXTRACT(EPOCH FROM AVG(response_time))/60.0       AS avg_min,
+                  EXTRACT(EPOCH FROM PERCENTILE_CONT(0.5)
+                    WITHIN GROUP (ORDER BY response_time))/60.0     AS median_min,
+                  COUNT(*)::int                                     AS n
+             FROM job_analogue
+            WHERE job_date BETWEEN $1::date AND $2::date
+              AND status = 'DONE'
+              AND response_time IS NOT NULL
+              AND upper(urgency) IN ('ASAP','PREBOOK')
+              AND pick_up_city ILIKE $3
+            GROUP BY upper(urgency)`;
+      const rtRows = await query(rtSql, [from, to, f.vehicles.value]);
+      const byUrg = Object.fromEntries(rtRows.map(r => [r.urg, r]));
+
       const jobs  = fleetRow?.jobs    || 0;
       const hours = hourRow?.hours    || 0;
       result[f.name] = {
@@ -117,6 +148,11 @@ export default async function handler(req, res) {
         hours_per_ride:  jobs > 0 ? hours / jobs : null,
         unique_vehicles: vRow?.n     || 0,
         unique_vehicles_proxy: true,
+        // New: split response time
+        response_time: {
+          asap:    byUrg.ASAP    ? { avg_min: byUrg.ASAP.avg_min,    median_min: byUrg.ASAP.median_min,    n: byUrg.ASAP.n }    : null,
+          prebook: byUrg.PREBOOK ? { avg_min: byUrg.PREBOOK.avg_min, median_min: byUrg.PREBOOK.median_min, n: byUrg.PREBOOK.n } : null,
+        },
         is_total: !!f.is_total,
         // Surface the proxy criteria so the UI tooltip can explain
         proxy_services: f.vehicles.kind === 'services' ? f.vehicles.value : null,
