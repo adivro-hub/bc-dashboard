@@ -30,17 +30,20 @@ const NO_SUPPLY_REGEX =
 // Bucharest + Ilfov county localities served by the Bucharest fleet.
 // pick_up_city in job_analogue gets matched against this list with ILIKE +
 // trim, so it survives 'Sector 1', 'Otopeni, Ilfov', accents, etc.
-// Services operated by the Bucharest fleets — used as the cross-job_analogue
-// proxy for the Bucharest total card. If a new service rolls out (e.g.
-// 'Electric'), add it here and the Bucharest total picks it up automatically.
+// Services operated by the BlackCab + Select fleets — used as the
+// cross-job_analogue proxy for the Bucharest total card.
+// Explicitly EXCLUDED (separate fleets/affiliates, NOT done by BC/Select):
+//   - 'BlackCab 7'  -> BC7 affiliate fleet
+//   - 'Elite'       -> luxury fleet
+//   - 'Shuttle Bus' -> shuttle bus operation
+// If a new service rolls out, add it here and the Bucharest total picks
+// it up automatically.
 const BUCHAREST_FLEET_SERVICES = [
-  'BlackCab', 'BlackCab 7',
+  'BlackCab',
   'Select',
-  'Elite',
   'ChildSeat', 'KidsCab',
   'iDrive Your Car',
   'MailCab',
-  'Shuttle Bus',
 ];
 
 const BUCHAREST_AREA_CITIES = [
@@ -66,23 +69,22 @@ const BUCHAREST_AREA_CITIES = [
 //   vehicles.value                     — array of services or city LIKE pattern
 const FLEETS = [
   {
-    // Headline card — always rendered first. Union of all Bucharest-
-    // prefixed fleets, with the cross-job_analogue proxy widened to the
-    // full whitelist of services the Bucharest fleets operate. Catches
-    // out-of-Bucharest rides done by Bucharest-fleet vehicles (Constanța,
-    // Brașov runs, Otopeni airport rides regardless of how the city is
-    // labelled, etc.) at the cost of also catching any non-Bucharest
-    // operations on those services (if any exist in the data).
+    // Headline card — always rendered first. Rolls up the BlackCab and
+    // Select fleets only. Does NOT include Bucharest Elite, Shuttle Bus,
+    // or BC7 affiliate fleets — those are separate operations.
+    // Both sides (income_structure match + job_analogue proxy) restricted
+    // to BC/Select so the rollup is internally consistent.
     name: 'Bucharest fleet (total)',
-    match:    { kind: 'pattern',   value: 'Bucharest%' },
-    vehicles: { kind: 'services',  value: BUCHAREST_FLEET_SERVICES },
+    match:    { kind: 'patterns', value: ['Bucharest BlackCab%', 'Bucharest Select%'] },
+    vehicles: { kind: 'services', value: BUCHAREST_FLEET_SERVICES },
     is_total: true,
   },
   {
     // Bucharest BlackCab Fleet + Bucharest BlackCab CS Fleet rolled up.
+    // 'BlackCab 7' is the BC7 affiliate, NOT the BlackCab fleet.
     name: 'Bucharest BlackCab',
-    match:    { kind: 'pattern', value: 'Bucharest BlackCab%' },
-    vehicles: { kind: 'services', value: ['BlackCab', 'BlackCab 7'] },
+    match:    { kind: 'pattern',  value: 'Bucharest BlackCab%' },
+    vehicles: { kind: 'services', value: ['BlackCab'] },
   },
   {
     // Bucharest Select Fleet + Bucharest Select CS Fleet rolled up.
@@ -107,34 +109,35 @@ export default async function handler(req, res) {
     // a shared object inside the .map callback used insertion-by-completion
     // order, which let the Total card sometimes appear after BlackCab/Select.
     const entries = await Promise.all(FLEETS.map(async f => {
-      // 1. Sales / jobs / earnings from income_structure_fleet
-      const fleetSql = f.match.kind === 'exact'
-        ? `SELECT COALESCE(SUM("Jobs"),0)::float    AS jobs,
-                  COALESCE(SUM("Total"),0)::float   AS total,
-                  COALESCE(SUM("Earnings"),0)::float AS earnings
-             FROM income_structure_fleet
-            WHERE "Date" BETWEEN $1::date AND $2::date
-              AND "Fleet" = $3
-              AND lower(trim("Fleet")) <> 'total'`
-        : `SELECT COALESCE(SUM("Jobs"),0)::float    AS jobs,
-                  COALESCE(SUM("Total"),0)::float   AS total,
-                  COALESCE(SUM("Earnings"),0)::float AS earnings
-             FROM income_structure_fleet
-            WHERE "Date" BETWEEN $1::date AND $2::date
-              AND "Fleet" LIKE $3
-              AND lower(trim("Fleet")) <> 'total'`;
+      // 1. Sales / jobs / earnings from income_structure_fleet.
+      // Three match kinds:
+      //   exact     -> "Fleet" = $3
+      //   pattern   -> "Fleet" LIKE $3
+      //   patterns  -> "Fleet" LIKE ANY($3::text[])   (array of LIKE patterns)
+      const fleetWhereExpr =
+        f.match.kind === 'exact'    ? `"Fleet" = $3` :
+        f.match.kind === 'patterns' ? `"Fleet" LIKE ANY($3::text[])` :
+                                      `"Fleet" LIKE $3`;
+      const fleetSql = `
+        SELECT COALESCE(SUM("Jobs"),0)::float    AS jobs,
+               COALESCE(SUM("Total"),0)::float   AS total,
+               COALESCE(SUM("Earnings"),0)::float AS earnings
+          FROM income_structure_fleet
+         WHERE "Date" BETWEEN $1::date AND $2::date
+           AND ${fleetWhereExpr}
+           AND lower(trim("Fleet")) <> 'total'`;
       const [fleetRow] = await query(fleetSql, [from, to, f.match.value]);
 
-      // 2. Login hours from income_structure_login_time
-      const hourSql = f.match.kind === 'exact'
-        ? `SELECT COALESCE(SUM("Hours"),0)::float AS hours
-             FROM income_structure_login_time
-            WHERE "Date" BETWEEN $1::date AND $2::date
-              AND "Fleet" = $3`
-        : `SELECT COALESCE(SUM("Hours"),0)::float AS hours
-             FROM income_structure_login_time
-            WHERE "Date" BETWEEN $1::date AND $2::date
-              AND "Fleet" LIKE $3`;
+      // 2. Login hours from income_structure_login_time (same match scheme)
+      const hourWhereExpr =
+        f.match.kind === 'exact'    ? `"Fleet" = $3` :
+        f.match.kind === 'patterns' ? `"Fleet" LIKE ANY($3::text[])` :
+                                      `"Fleet" LIKE $3`;
+      const hourSql = `
+        SELECT COALESCE(SUM("Hours"),0)::float AS hours
+          FROM income_structure_login_time
+         WHERE "Date" BETWEEN $1::date AND $2::date
+           AND ${hourWhereExpr}`;
       const [hourRow] = await query(hourSql, [from, to, f.match.value]);
 
       // 3. Unique vehicles + their cross-service activity. status='DONE' on
