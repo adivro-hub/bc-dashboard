@@ -1212,16 +1212,8 @@ window.renderDashboard = function renderDashboard(){
                   ${deltaCell(c.hours, p.hours, fmtNum)}</tr>
               <tr><td>Unique vehicles
                       <span class="muted" title="${proxyTooltip(c)} — only DONE jobs">(proxy)</span></td>
-                  <td class="num">${fmtNum(c.unique_vehicles)}
-                      ${c.unique_vehicles_total_rides
-                          ? `<span class="muted" style="font-size:11px"> (${fmtNum(c.unique_vehicles_total_rides)} rides total)</span>`
-                          : ''}
-                  </td>
-                  <td class="num muted">${fmtNum(p.unique_vehicles)}
-                      ${p.unique_vehicles_total_rides
-                          ? `<span style="font-size:11px"> (${fmtNum(p.unique_vehicles_total_rides)})</span>`
-                          : ''}
-                  </td>
+                  <td class="num">${fmtNum(c.unique_vehicles)}</td>
+                  <td class="num muted">${fmtNum(p.unique_vehicles)}</td>
                   ${deltaCell(c.unique_vehicles, p.unique_vehicles, fmtNum)}</tr>
               ${(c.cross_fleet_vehicles || p.cross_fleet_vehicles) ? `
               <tr><td>… also on other ${c.proxy_city ? 'cities' : 'services'}
@@ -1241,9 +1233,18 @@ window.renderDashboard = function renderDashboard(){
                     v => v.toFixed(2))}</tr>
 
               <tr class="group-head"><td colspan="4">Volume &amp; productivity</td></tr>
-              <tr><td>Rides (jobs)</td>
-                  <td class="num"><strong>${fmtNum(c.jobs)}</strong></td>
-                  <td class="num muted">${fmtNum(p.jobs)}</td>
+              <tr><td>Rides (jobs)
+                      <span class="muted" title="Headline = rides attributed to this fleet in income_structure_fleet (authoritative). Parenthetical = total DONE rides by the same fleet's vehicles incl. their work on OTHER services (so BlackCab vehicles' Select rides count here)">(?)</span></td>
+                  <td class="num"><strong>${fmtNum(c.jobs)}</strong>
+                      ${c.unique_vehicles_total_rides
+                          ? `<span class="muted" style="font-size:11px"> (${fmtNum(c.unique_vehicles_total_rides)} total by fleet vehicles)</span>`
+                          : ''}
+                  </td>
+                  <td class="num muted">${fmtNum(p.jobs)}
+                      ${p.unique_vehicles_total_rides
+                          ? `<span style="font-size:11px"> (${fmtNum(p.unique_vehicles_total_rides)})</span>`
+                          : ''}
+                  </td>
                   ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
               <tr><td>Rides / vehicle / day</td>
                   <td class="num">${fmtFloat(ridesPerVehiclePerDay(c.jobs, c.unique_vehicles, periodDays))}</td>
