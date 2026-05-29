@@ -1294,15 +1294,6 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num"><strong>${fmtNum(c.jobs)}</strong></td>
                   <td class="num muted">${fmtNum(p.jobs)}</td>
                   ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
-              ${(c.cross_fleet_vehicles || p.cross_fleet_vehicles) ? `
-              <tr><td>Cross-fleet rides
-                      <span class="muted" title="DONE rides those fleet vehicles did on OTHER services (or — for the city-based total card — outside the city list).">(?)</span></td>
-                  <td class="num">${fmtNum(c.cross_fleet_rides)}
-                      <span class="muted" style="font-size:11px"> (${fmtNum(c.cross_fleet_vehicles)} vehicles)</span></td>
-                  <td class="num muted">${fmtNum(p.cross_fleet_rides)}
-                      <span style="font-size:11px"> (${fmtNum(p.cross_fleet_vehicles)})</span></td>
-                  ${deltaCell(c.cross_fleet_rides, p.cross_fleet_rides, fmtNum)}</tr>
-              ` : ''}
               <tr><td>Sales (RON)</td>
                   <td class="num">${fmtRon(c.sales)}</td>
                   <td class="num muted">${fmtRon(p.sales)}</td>
