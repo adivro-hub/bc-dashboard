@@ -1210,11 +1210,6 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num">${fmtNum(c.hours)}</td>
                   <td class="num muted">${fmtNum(p.hours)}</td>
                   ${deltaCell(c.hours, p.hours, fmtNum)}</tr>
-              <tr><td>Unique vehicles
-                      <span class="muted" title="${proxyTooltip(c)} — only DONE jobs">(proxy)</span></td>
-                  <td class="num">${fmtNum(c.unique_vehicles)}</td>
-                  <td class="num muted">${fmtNum(p.unique_vehicles)}</td>
-                  ${deltaCell(c.unique_vehicles, p.unique_vehicles, fmtNum)}</tr>
               <tr><td>Hours / vehicle</td>
                   <td class="num">${fmtFloat(c.unique_vehicles ? c.hours/c.unique_vehicles : null)}</td>
                   <td class="num muted">${fmtFloat(p.unique_vehicles ? p.hours/p.unique_vehicles : null)}</td>
@@ -1260,17 +1255,13 @@ window.renderDashboard = function renderDashboard(){
                        c.response_time?.asap,    p.response_time?.asap)}
               ${rtRow('Avg on-way time — Prebook',
                        c.response_time?.prebook, p.response_time?.prebook)}
-              <tr><td>Cancelled rides</td>
-                  <td class="num">${fmtNum(c.cancelled_jobs)}</td>
-                  <td class="num muted">${fmtNum(p.cancelled_jobs)}</td>
-                  ${deltaCellSwapped(c.cancelled_jobs, p.cancelled_jobs)}</tr>
               <tr><td>Cancellation rate
                       <span class="muted" title="CANCELLED / total bookings (every reservation in the period, regardless of status)">(?)</span></td>
                   <td class="num"><strong>${fmtPct1(c.cancellation_rate)}</strong></td>
                   <td class="num muted">${fmtPct1(p.cancellation_rate)}</td>
                   ${deltaCellSwapped(c.cancellation_rate, p.cancellation_rate)}</tr>
               <tr><td>No-supply cancels
-                      <span class="muted" title="Cancellations where cancel_reason matches no-supply patterns (no cars available, serviciul indisponibil, nicio mașină, …)">(?)</span></td>
+                      <span class="muted" title="Subset of cancelled rides — cancel_reason matches no-supply patterns (no cars available, serviciul indisponibil, nicio mașină, …)">(subset)</span></td>
                   <td class="num">${fmtNum(c.no_supply_cancels)}</td>
                   <td class="num muted">${fmtNum(p.no_supply_cancels)}</td>
                   ${deltaCellSwapped(c.no_supply_cancels, p.no_supply_cancels)}</tr>
