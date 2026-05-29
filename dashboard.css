@@ -567,6 +567,19 @@ tbody tr:hover{background:rgba(245,204,30,.07)}
   .overlay-cta:hover,
   .period-type-btn:hover { filter: none; }
 }
+/* Section subdividers inside fleet cards' KPI tables */
+tr.group-head td{
+  background:var(--panel-2);
+  color:var(--muted);
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.6px;
+  font-weight:700;
+  padding:5px 10px;
+  text-align:left !important;
+  border-bottom:1px solid var(--line);
+}
+
 /* Bucharest total card on Fleets tab — spans both columns to stand out */
 .fleet-total{
   border-color: var(--accent);

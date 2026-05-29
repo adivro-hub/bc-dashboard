@@ -23,6 +23,10 @@
  */
 import { query, ok, bad, parseDateRange, requireAuth } from './_db.js';
 
+// Same regex as api/kpis.js — matches both EN and RO no-supply cancel reasons.
+const NO_SUPPLY_REGEX =
+  '(no cars available|serviciul .*indisponibil|nicio ma[sș]in[aă]|nu vrea sa astepte|sofer de la bv)';
+
 // Bucharest + Ilfov county localities served by the Bucharest fleet.
 // pick_up_city in job_analogue gets matched against this list with ILIKE +
 // trim, so it survives 'Sector 1', 'Otopeni, Ilfov', accents, etc.
@@ -171,6 +175,31 @@ export default async function handler(req, res) {
       const rtRows = await query(rtSql, rtParams);
       const byUrg = Object.fromEntries(rtRows.map(r => [r.urg, r]));
 
+      // 5. Cancellation diagnostics: total CANCELLED, DONE, and the
+      // subset of cancellations attributable to lack of supply.
+      // Same fleet proxy as elsewhere.
+      let cancelSql, cancelParams;
+      const cancelBase = `
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'DONE')::int                         AS done_n,
+          COUNT(*) FILTER (WHERE status = 'CANCELLED')::int                    AS cancel_n,
+          COUNT(*) FILTER (
+            WHERE status = 'CANCELLED' AND cancel_reason ~* $4
+          )::int                                                               AS no_supply_n
+          FROM job_analogue
+         WHERE job_date BETWEEN $1::date AND $2::date`;
+      if (f.vehicles.kind === 'services') {
+        cancelSql = cancelBase + ` AND service = ANY($3::text[])`;
+        cancelParams = [from, to, f.vehicles.value, NO_SUPPLY_REGEX];
+      } else if (f.vehicles.kind === 'city_list') {
+        cancelSql = cancelBase + ` AND lower(trim(pick_up_city)) = ANY($3::text[])`;
+        cancelParams = [from, to, f.vehicles.value.map(s => s.toLowerCase().trim()), NO_SUPPLY_REGEX];
+      } else {
+        cancelSql = cancelBase + ` AND pick_up_city ILIKE $3`;
+        cancelParams = [from, to, f.vehicles.value, NO_SUPPLY_REGEX];
+      }
+      const [cancelRow] = await query(cancelSql, cancelParams);
+
       const jobs  = fleetRow?.jobs    || 0;
       const hours = hourRow?.hours    || 0;
       result[f.name] = {
@@ -186,6 +215,13 @@ export default async function handler(req, res) {
           asap:    byUrg.ASAP    ? { avg_min: byUrg.ASAP.avg_min,    median_min: byUrg.ASAP.median_min,    n: byUrg.ASAP.n }    : null,
           prebook: byUrg.PREBOOK ? { avg_min: byUrg.PREBOOK.avg_min, median_min: byUrg.PREBOOK.median_min, n: byUrg.PREBOOK.n } : null,
         },
+        // Diagnostics for correlating volume drops with supply/demand
+        done_jobs:           cancelRow?.done_n      || 0,
+        cancelled_jobs:      cancelRow?.cancel_n    || 0,
+        no_supply_cancels:   cancelRow?.no_supply_n || 0,
+        cancellation_rate:   (cancelRow?.done_n + cancelRow?.cancel_n) > 0
+                               ? cancelRow.cancel_n / (cancelRow.done_n + cancelRow.cancel_n)
+                               : null,
         is_total: !!f.is_total,
         // Surface the proxy criteria so the UI tooltip can explain
         proxy_services: f.vehicles.kind === 'services'  ? f.vehicles.value : null,

@@ -1145,6 +1145,23 @@ window.renderDashboard = function renderDashboard(){
       return 'Proxy count';
     }
     function fmtMin(v){ return v == null ? '—' : `${Number(v).toFixed(1)} min`; }
+    function fmtPct1(v){ return v == null ? '—' : `${(Number(v)*100).toFixed(1)}%`; }
+    function fmtFloat(v, d=2){ return v == null ? '—' : Number(v).toFixed(d); }
+    // jobs / unique_vehicles / days in the period
+    const periodDays = (() => {
+      const f = cur.period_from, t = cur.period_to;
+      if (!f || !t) return 0;
+      return Math.max(1, Math.round((new Date(t+'T12:00:00Z') - new Date(f+'T12:00:00Z'))/86400000) + 1);
+    })();
+    const prevPeriodDays = (() => {
+      const f = prev.period_from, t = prev.period_to;
+      if (!f || !t) return periodDays;
+      return Math.max(1, Math.round((new Date(t+'T12:00:00Z') - new Date(f+'T12:00:00Z'))/86400000) + 1);
+    })();
+    function ridesPerVehiclePerDay(jobs, veh, days){
+      if (!veh || !days) return null;
+      return jobs / veh / days;
+    }
     // Render one "Avg response — …" row for ASAP or Prebook.
     function rtRow(label, cur, prev){
       const cAvg = cur?.avg_min, pAvg = prev?.avg_min;
@@ -1186,27 +1203,58 @@ window.renderDashboard = function renderDashboard(){
               <th>Metric</th><th>Current</th><th>Previous</th><th>Δ %</th>
             </tr></thead>
             <tbody>
+              <tr class="group-head"><td colspan="4">Capacity</td></tr>
               <tr><td>Online hours</td>
                   <td class="num">${fmtNum(c.hours)}</td>
                   <td class="num muted">${fmtNum(p.hours)}</td>
                   ${deltaCell(c.hours, p.hours, fmtNum)}</tr>
-              <tr><td>Rides (jobs)</td>
-                  <td class="num">${fmtNum(c.jobs)}</td>
-                  <td class="num muted">${fmtNum(p.jobs)}</td>
-                  ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
-              <tr><td>Hours / ride</td>
-                  <td class="num">${cHpr == null ? '—' : cHpr.toFixed(2)}</td>
-                  <td class="num muted">${pHpr == null ? '—' : pHpr.toFixed(2)}</td>
-                  ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
-              ${rtRow('Avg response — ASAP',
-                       c.response_time?.asap,    p.response_time?.asap)}
-              ${rtRow('Avg response — Prebook',
-                       c.response_time?.prebook, p.response_time?.prebook)}
               <tr><td>Unique vehicles
                       <span class="muted" title="${proxyTooltip(c)}">(proxy)</span></td>
                   <td class="num">${fmtNum(c.unique_vehicles)}</td>
                   <td class="num muted">${fmtNum(p.unique_vehicles)}</td>
                   ${deltaCell(c.unique_vehicles, p.unique_vehicles, fmtNum)}</tr>
+              <tr><td>Hours / vehicle</td>
+                  <td class="num">${fmtFloat(c.unique_vehicles ? c.hours/c.unique_vehicles : null)}</td>
+                  <td class="num muted">${fmtFloat(p.unique_vehicles ? p.hours/p.unique_vehicles : null)}</td>
+                  ${deltaCell(
+                    c.unique_vehicles ? c.hours/c.unique_vehicles : null,
+                    p.unique_vehicles ? p.hours/p.unique_vehicles : null,
+                    v => v.toFixed(2))}</tr>
+
+              <tr class="group-head"><td colspan="4">Volume &amp; productivity</td></tr>
+              <tr><td>Rides (jobs)</td>
+                  <td class="num"><strong>${fmtNum(c.jobs)}</strong></td>
+                  <td class="num muted">${fmtNum(p.jobs)}</td>
+                  ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
+              <tr><td>Rides / vehicle / day</td>
+                  <td class="num">${fmtFloat(ridesPerVehiclePerDay(c.jobs, c.unique_vehicles, periodDays))}</td>
+                  <td class="num muted">${fmtFloat(ridesPerVehiclePerDay(p.jobs, p.unique_vehicles, prevPeriodDays))}</td>
+                  ${deltaCell(
+                    ridesPerVehiclePerDay(c.jobs, c.unique_vehicles, periodDays),
+                    ridesPerVehiclePerDay(p.jobs, p.unique_vehicles, prevPeriodDays),
+                    v => v.toFixed(2))}</tr>
+              <tr><td>Hours / ride</td>
+                  <td class="num">${cHpr == null ? '—' : cHpr.toFixed(2)}</td>
+                  <td class="num muted">${pHpr == null ? '—' : pHpr.toFixed(2)}</td>
+                  ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
+
+              <tr class="group-head"><td colspan="4">Service quality</td></tr>
+              ${rtRow('Avg response — ASAP',
+                       c.response_time?.asap,    p.response_time?.asap)}
+              ${rtRow('Avg response — Prebook',
+                       c.response_time?.prebook, p.response_time?.prebook)}
+              <tr><td>Cancellation rate
+                      <span class="muted" title="CANCELLED / (DONE + CANCELLED) within the same fleet proxy">(?)</span></td>
+                  <td class="num">${fmtPct1(c.cancellation_rate)}</td>
+                  <td class="num muted">${fmtPct1(p.cancellation_rate)}</td>
+                  ${deltaCellSwapped(c.cancellation_rate, p.cancellation_rate)}</tr>
+              <tr><td>No-supply cancels
+                      <span class="muted" title="Cancellations where cancel_reason matches no-supply patterns (no cars available, serviciul indisponibil, nicio mașină, …)">(?)</span></td>
+                  <td class="num">${fmtNum(c.no_supply_cancels)}</td>
+                  <td class="num muted">${fmtNum(p.no_supply_cancels)}</td>
+                  ${deltaCellSwapped(c.no_supply_cancels, p.no_supply_cancels)}</tr>
+
+              <tr class="group-head"><td colspan="4">Revenue</td></tr>
               <tr><td>Sales (RON)</td>
                   <td class="num">${fmtRon(c.sales)}</td>
                   <td class="num muted">${fmtRon(p.sales)}</td>
