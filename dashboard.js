@@ -1217,38 +1217,41 @@ window.renderDashboard = function renderDashboard(){
                     c.unique_vehicles ? c.hours/c.unique_vehicles : null,
                     p.unique_vehicles ? p.hours/p.unique_vehicles : null,
                     v => v.toFixed(2))}</tr>
+              <tr><td>Hours / ride</td>
+                  <td class="num">${cHpr == null ? '—' : cHpr.toFixed(2)}</td>
+                  <td class="num muted">${pHpr == null ? '—' : pHpr.toFixed(2)}</td>
+                  ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
 
-              <tr class="group-head"><td colspan="4">Volume &amp; productivity</td></tr>
+              <tr class="group-head"><td colspan="4">Volume &amp; Revenue</td></tr>
               <tr><td>Service rides
-                      <span class="muted" title="Rides attributed to this fleet in income_structure_fleet — authoritative count for what's officially booked as this fleet's service.">(?)</span></td>
+                      <span class="muted" title="Mașinile din flota BlackCab deservesc și serviciul Select, nu și vice versa.">(?)</span></td>
                   <td class="num"><strong>${fmtNum(c.jobs)}</strong></td>
                   <td class="num muted">${fmtNum(p.jobs)}</td>
                   ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
-              <tr><td>All rides
-                      <span class="muted" title="Total DONE rides by the fleet's vehicles incl. work on OTHER services (so BlackCab vehicles' Select rides count here). Source: job_analogue.">(?)</span></td>
-                  <td class="num">${fmtNum(c.unique_vehicles_total_rides)}</td>
-                  <td class="num muted">${fmtNum(p.unique_vehicles_total_rides)}</td>
-                  ${deltaCell(c.unique_vehicles_total_rides, p.unique_vehicles_total_rides, fmtNum)}</tr>
               ${(c.cross_fleet_vehicles || p.cross_fleet_vehicles) ? `
               <tr><td>Cross-fleet rides
-                      <span class="muted" title="DONE rides those fleet vehicles did on OTHER services (or — for the city-based total card — outside the city list). Equals 'All rides' − 'Service rides' when all rides land in the same proxy.">(?)</span></td>
+                      <span class="muted" title="DONE rides those fleet vehicles did on OTHER services (or — for the city-based total card — outside the city list).">(?)</span></td>
                   <td class="num">${fmtNum(c.cross_fleet_rides)}
                       <span class="muted" style="font-size:11px"> (${fmtNum(c.cross_fleet_vehicles)} vehicles)</span></td>
                   <td class="num muted">${fmtNum(p.cross_fleet_rides)}
                       <span style="font-size:11px"> (${fmtNum(p.cross_fleet_vehicles)})</span></td>
                   ${deltaCell(c.cross_fleet_rides, p.cross_fleet_rides, fmtNum)}</tr>
               ` : ''}
-              <tr><td>Rides / vehicle / day</td>
-                  <td class="num">${fmtFloat(ridesPerVehiclePerDay(c.jobs, c.unique_vehicles, periodDays))}</td>
-                  <td class="num muted">${fmtFloat(ridesPerVehiclePerDay(p.jobs, p.unique_vehicles, prevPeriodDays))}</td>
+              <tr><td>Sales (RON)</td>
+                  <td class="num">${fmtRon(c.sales)}</td>
+                  <td class="num muted">${fmtRon(p.sales)}</td>
+                  ${deltaCell(c.sales, p.sales, fmtRon)}</tr>
+              <tr><td>Earnings (RON)</td>
+                  <td class="num">${fmtRon(c.earnings)}</td>
+                  <td class="num muted">${fmtRon(p.earnings)}</td>
+                  ${deltaCell(c.earnings, p.earnings, fmtRon)}</tr>
+              <tr><td>Avg price / ride (RON)</td>
+                  <td class="num">${c.jobs > 0 ? fmtRon(c.sales / c.jobs) : '—'}</td>
+                  <td class="num muted">${p.jobs > 0 ? fmtRon(p.sales / p.jobs) : '—'}</td>
                   ${deltaCell(
-                    ridesPerVehiclePerDay(c.jobs, c.unique_vehicles, periodDays),
-                    ridesPerVehiclePerDay(p.jobs, p.unique_vehicles, prevPeriodDays),
-                    v => v.toFixed(2))}</tr>
-              <tr><td>Hours / ride</td>
-                  <td class="num">${cHpr == null ? '—' : cHpr.toFixed(2)}</td>
-                  <td class="num muted">${pHpr == null ? '—' : pHpr.toFixed(2)}</td>
-                  ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
+                    c.jobs > 0 ? c.sales / c.jobs : null,
+                    p.jobs > 0 ? p.sales / p.jobs : null,
+                    fmtRon)}</tr>
 
               <tr class="group-head"><td colspan="4">Service quality</td></tr>
               ${rtRow('Avg on-way time — ASAP',
@@ -1260,21 +1263,6 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num"><strong>${fmtPct1(c.cancellation_rate)}</strong></td>
                   <td class="num muted">${fmtPct1(p.cancellation_rate)}</td>
                   ${deltaCellSwapped(c.cancellation_rate, p.cancellation_rate)}</tr>
-              <tr><td>No-supply cancels
-                      <span class="muted" title="Subset of cancelled rides — cancel_reason matches no-supply patterns (no cars available, serviciul indisponibil, nicio mașină, …)">(subset)</span></td>
-                  <td class="num">${fmtNum(c.no_supply_cancels)}</td>
-                  <td class="num muted">${fmtNum(p.no_supply_cancels)}</td>
-                  ${deltaCellSwapped(c.no_supply_cancels, p.no_supply_cancels)}</tr>
-
-              <tr class="group-head"><td colspan="4">Revenue</td></tr>
-              <tr><td>Sales (RON)</td>
-                  <td class="num">${fmtRon(c.sales)}</td>
-                  <td class="num muted">${fmtRon(p.sales)}</td>
-                  ${deltaCell(c.sales, p.sales, fmtRon)}</tr>
-              <tr><td>Earnings (RON)</td>
-                  <td class="num">${fmtRon(c.earnings)}</td>
-                  <td class="num muted">${fmtRon(p.earnings)}</td>
-                  ${deltaCell(c.earnings, p.earnings, fmtRon)}</tr>
             </tbody>
           </table>
         </div>`);
