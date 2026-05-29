@@ -1243,9 +1243,13 @@ window.renderDashboard = function renderDashboard(){
                        c.response_time?.asap,    p.response_time?.asap)}
               ${rtRow('Avg response — Prebook',
                        c.response_time?.prebook, p.response_time?.prebook)}
+              <tr><td>Cancelled rides</td>
+                  <td class="num">${fmtNum(c.cancelled_jobs)}</td>
+                  <td class="num muted">${fmtNum(p.cancelled_jobs)}</td>
+                  ${deltaCellSwapped(c.cancelled_jobs, p.cancelled_jobs)}</tr>
               <tr><td>Cancellation rate
                       <span class="muted" title="CANCELLED / (DONE + CANCELLED) within the same fleet proxy">(?)</span></td>
-                  <td class="num">${fmtPct1(c.cancellation_rate)}</td>
+                  <td class="num"><strong>${fmtPct1(c.cancellation_rate)}</strong></td>
                   <td class="num muted">${fmtPct1(p.cancellation_rate)}</td>
                   ${deltaCellSwapped(c.cancellation_rate, p.cancellation_rate)}</tr>
               <tr><td>No-supply cancels
