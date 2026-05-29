@@ -1185,78 +1185,13 @@ window.renderDashboard = function renderDashboard(){
       const arrow = diff <= 0 ? '▼' : '▲';
       return `<td class="num ${cls}">${arrow} ${(diff>=0?'+':'')}${pct.toFixed(1)}%</td>`;
     }
-    // Build a single .card.kpi tile in the same shape as the Overview tab's
-    // KPIs: label, current value, "prev …", coloured delta arrow.
-    function fleetKpiCard(label, cv, pv, fmt, lowerBetter=false){
-      let cls;
-      if (cv == null || pv == null || pv === 0){
-        cls = 'flat';
-      } else {
-        const delta = ((cv - pv) / pv) * 100;
-        if (Math.abs(delta) < 0.05)   cls = 'flat';
-        else if (lowerBetter)         cls = delta <= 0 ? 'up' : 'down';
-        else                          cls = delta >= 0 ? 'up' : 'down';
-      }
-      const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '■';
-      const deltaTxt = (cv == null || pv == null || pv === 0)
-        ? '—'
-        : `${(((cv - pv) / pv) * 100) >= 0 ? '+' : ''}${(((cv - pv) / pv) * 100).toFixed(1)}%`;
-      return `<div class="card kpi">
-        <div class="label">${label}</div>
-        <div class="value num">${fmt(cv)}</div>
-        <div class="prev num">prev ${fmt(pv)}</div>
-        <span class="delta ${cls}">${arrow} ${deltaTxt}</span>
-      </div>`;
-    }
-
     for (const name of fleets){
       const c = curBundle.fleets[name]  || {};
       const p = prevBundle.fleets[name] || {};
       const cHpr = c.hours_per_ride ?? rideRatio(c.hours, c.jobs);
       const pHpr = p.hours_per_ride ?? rideRatio(p.hours, p.jobs);
 
-      // TOTAL fleet → render as a grid of KPI tiles (Overview style),
-      // spanning both columns of the .grid.panels container.
-      if (c.is_total){
-        const avgPriceCur  = c.jobs > 0 ? c.sales / c.jobs : null;
-        const avgPricePrev = p.jobs > 0 ? p.sales / p.jobs : null;
-        const hpvCur  = c.unique_vehicles ? c.hours / c.unique_vehicles : null;
-        const hpvPrev = p.unique_vehicles ? p.hours / p.unique_vehicles : null;
-        const fmt2 = v => v == null ? '—' : Number(v).toFixed(2);
-
-        const tiles = [
-          fleetKpiCard('Service rides',      c.jobs, p.jobs, fmtNum),
-          fleetKpiCard('Sales (RON)',        c.sales, p.sales, fmtRon),
-          fleetKpiCard('Earnings (RON)',     c.earnings, p.earnings, fmtRon),
-          fleetKpiCard('Avg price / ride',   avgPriceCur, avgPricePrev, fmtRon),
-          fleetKpiCard('Unique vehicles',    c.unique_vehicles, p.unique_vehicles, fmtNum),
-          fleetKpiCard('Online hours',       c.hours, p.hours, fmtNum),
-          fleetKpiCard('Hours / vehicle',    hpvCur, hpvPrev, fmt2),
-          fleetKpiCard('Hours / ride',       cHpr,   pHpr,   fmt2),
-          fleetKpiCard('ASAP on-way (min)',
-                       c.response_time?.asap?.avg_min,
-                       p.response_time?.asap?.avg_min, fmtMin, /*lowerBetter*/ true),
-          fleetKpiCard('Prebook on-way (min)',
-                       c.response_time?.prebook?.avg_min,
-                       p.response_time?.prebook?.avg_min, fmtMin, true),
-          fleetKpiCard('Cancellation rate',  c.cancellation_rate, p.cancellation_rate, fmtPct1, true),
-        ].join('');
-
-        host.insertAdjacentHTML('beforeend', `
-          <div class="fleet-total-section" style="grid-column: 1 / -1; margin-top:8px">
-            <div class="row-head">
-              <div><strong>${name}</strong>
-                <span class="pill">${fmtRange(cur)}</span>
-                <span class="pill" style="background:transparent">vs ${fmtRange(prev)}</span>
-                <span class="pill" style="background:var(--accent);color:#0b1020">TOTAL</span>
-              </div>
-            </div>
-            <div class="grid kpis">${tiles}</div>
-          </div>`);
-        continue;
-      }
-
-      const cardClass = 'card';
+      const cardClass = c.is_total ? 'card fleet-total' : 'card';
       host.insertAdjacentHTML('beforeend', `
         <div class="${cardClass}">
           <div class="row-head">
