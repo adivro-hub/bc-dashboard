@@ -30,6 +30,19 @@ const NO_SUPPLY_REGEX =
 // Bucharest + Ilfov county localities served by the Bucharest fleet.
 // pick_up_city in job_analogue gets matched against this list with ILIKE +
 // trim, so it survives 'Sector 1', 'Otopeni, Ilfov', accents, etc.
+// Services operated by the Bucharest fleets — used as the cross-job_analogue
+// proxy for the Bucharest total card. If a new service rolls out (e.g.
+// 'Electric'), add it here and the Bucharest total picks it up automatically.
+const BUCHAREST_FLEET_SERVICES = [
+  'BlackCab', 'BlackCab 7',
+  'Select',
+  'Elite',
+  'ChildSeat', 'KidsCab',
+  'iDrive Your Car',
+  'MailCab',
+  'Shuttle Bus',
+];
+
 const BUCHAREST_AREA_CITIES = [
   // Bucharest itself (any sector / variation)
   'Bucharest', 'București', 'Bucuresti',
@@ -66,9 +79,17 @@ const FLEETS = [
   },
   {
     // Everything starting with Bucharest in the source fleet column.
-    name: 'Bucharest + Ilfov (total)',
-    match:    { kind: 'pattern',    value: 'Bucharest%' },
-    vehicles: { kind: 'city_list',  value: BUCHAREST_AREA_CITIES },
+    // For unique-vehicles/response-time/cancellations the proxy filters by
+    // service whitelist instead of pick_up_city. job_analogue has no
+    // fleet column, so the closest "fleet only" approximation is the
+    // union of all services the Bucharest fleets operate. This catches
+    // out-of-Bucharest rides done by Bucharest-fleet vehicles (Constanța,
+    // Brașov runs, Otopeni airport rides regardless of how the city is
+    // labelled, etc.) at the cost of also catching any non-Bucharest
+    // operations on those services (if any exist in the data).
+    name: 'Bucharest fleet (total)',
+    match:    { kind: 'pattern',   value: 'Bucharest%' },
+    vehicles: { kind: 'services',  value: BUCHAREST_FLEET_SERVICES },
     is_total: true,
   },
 ];
