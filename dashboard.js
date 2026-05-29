@@ -1215,15 +1215,6 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num">${fmtNum(c.unique_vehicles)}</td>
                   <td class="num muted">${fmtNum(p.unique_vehicles)}</td>
                   ${deltaCell(c.unique_vehicles, p.unique_vehicles, fmtNum)}</tr>
-              ${(c.cross_fleet_vehicles || p.cross_fleet_vehicles) ? `
-              <tr><td>… also on other ${c.proxy_city ? 'cities' : 'services'}
-                      <span class="muted" title="Of the unique vehicles, how many ALSO did DONE rides outside this fleet's whitelist in the same period — and how many such rides">(?)</span></td>
-                  <td class="num">${fmtNum(c.cross_fleet_vehicles)}
-                      <span class="muted" style="font-size:11px"> (${fmtNum(c.cross_fleet_rides)} rides)</span></td>
-                  <td class="num muted">${fmtNum(p.cross_fleet_vehicles)}
-                      <span style="font-size:11px"> (${fmtNum(p.cross_fleet_rides)})</span></td>
-                  ${deltaCell(c.cross_fleet_vehicles, p.cross_fleet_vehicles, fmtNum)}</tr>
-              ` : ''}
               <tr><td>Hours / vehicle</td>
                   <td class="num">${fmtFloat(c.unique_vehicles ? c.hours/c.unique_vehicles : null)}</td>
                   <td class="num muted">${fmtFloat(p.unique_vehicles ? p.hours/p.unique_vehicles : null)}</td>
@@ -1233,19 +1224,25 @@ window.renderDashboard = function renderDashboard(){
                     v => v.toFixed(2))}</tr>
 
               <tr class="group-head"><td colspan="4">Volume &amp; productivity</td></tr>
-              <tr><td>Rides (jobs)
-                      <span class="muted" title="Headline = rides attributed to this fleet in income_structure_fleet (authoritative). Parenthetical = total DONE rides by the same fleet's vehicles incl. their work on OTHER services (so BlackCab vehicles' Select rides count here)">(?)</span></td>
-                  <td class="num"><strong>${fmtNum(c.jobs)}</strong>
-                      ${c.unique_vehicles_total_rides
-                          ? `<span class="muted" style="font-size:11px"> (${fmtNum(c.unique_vehicles_total_rides)} total by fleet vehicles)</span>`
-                          : ''}
-                  </td>
-                  <td class="num muted">${fmtNum(p.jobs)}
-                      ${p.unique_vehicles_total_rides
-                          ? `<span style="font-size:11px"> (${fmtNum(p.unique_vehicles_total_rides)})</span>`
-                          : ''}
-                  </td>
+              <tr><td>Service rides
+                      <span class="muted" title="Rides attributed to this fleet in income_structure_fleet — authoritative count for what's officially booked as this fleet's service.">(?)</span></td>
+                  <td class="num"><strong>${fmtNum(c.jobs)}</strong></td>
+                  <td class="num muted">${fmtNum(p.jobs)}</td>
                   ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
+              <tr><td>All rides
+                      <span class="muted" title="Total DONE rides by the fleet's vehicles incl. work on OTHER services (so BlackCab vehicles' Select rides count here). Source: job_analogue.">(?)</span></td>
+                  <td class="num">${fmtNum(c.unique_vehicles_total_rides)}</td>
+                  <td class="num muted">${fmtNum(p.unique_vehicles_total_rides)}</td>
+                  ${deltaCell(c.unique_vehicles_total_rides, p.unique_vehicles_total_rides, fmtNum)}</tr>
+              ${(c.cross_fleet_vehicles || p.cross_fleet_vehicles) ? `
+              <tr><td>Cross-fleet rides
+                      <span class="muted" title="DONE rides those fleet vehicles did on OTHER services (or — for the city-based total card — outside the city list). Equals 'All rides' − 'Service rides' when all rides land in the same proxy.">(?)</span></td>
+                  <td class="num">${fmtNum(c.cross_fleet_rides)}
+                      <span class="muted" style="font-size:11px"> (${fmtNum(c.cross_fleet_vehicles)} vehicles)</span></td>
+                  <td class="num muted">${fmtNum(p.cross_fleet_rides)}
+                      <span style="font-size:11px"> (${fmtNum(p.cross_fleet_vehicles)})</span></td>
+                  ${deltaCell(c.cross_fleet_rides, p.cross_fleet_rides, fmtNum)}</tr>
+              ` : ''}
               <tr><td>Rides / vehicle / day</td>
                   <td class="num">${fmtFloat(ridesPerVehiclePerDay(c.jobs, c.unique_vehicles, periodDays))}</td>
                   <td class="num muted">${fmtFloat(ridesPerVehiclePerDay(p.jobs, p.unique_vehicles, prevPeriodDays))}</td>
