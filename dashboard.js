@@ -1166,9 +1166,11 @@ window.renderDashboard = function renderDashboard(){
     function rtRow(label, cur, prev){
       const cAvg = cur?.avg_min, pAvg = prev?.avg_min;
       const cN   = cur?.n ?? 0,  pN   = prev?.n ?? 0;
-      const sub = (cN || pN) ? `<span class="muted">(${cN.toLocaleString()} / ${pN.toLocaleString()} done jobs)</span>` : '';
+      const sub = (cN || pN) ? `<span class="muted">(${cN.toLocaleString()} / ${pN.toLocaleString()} done)</span>` : '';
+      const kind = label.includes('ASAP') ? 'ASAP' : 'PREBOOK';
+      const tip = `Lower is better — avg on_way_time (driver-acceptance → pickup arrival) for ${kind} jobs in this fleet`;
       return `<tr>
-        <td>${label} <span class="muted" title="Lower is better — avg time from booking to passenger on board for ${label.includes('ASAP')?'ASAP':'PREBOOK'} jobs in this fleet">${sub}</span></td>
+        <td>${label} <span class="muted" title="${tip}">${sub}</span></td>
         <td class="num">${fmtMin(cAvg)}</td>
         <td class="num muted">${fmtMin(pAvg)}</td>
         ${deltaCellSwapped(cAvg, pAvg)}
@@ -1239,9 +1241,9 @@ window.renderDashboard = function renderDashboard(){
                   ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
 
               <tr class="group-head"><td colspan="4">Service quality</td></tr>
-              ${rtRow('Avg response — ASAP',
+              ${rtRow('Avg on-way time — ASAP',
                        c.response_time?.asap,    p.response_time?.asap)}
-              ${rtRow('Avg response — Prebook',
+              ${rtRow('Avg on-way time — Prebook',
                        c.response_time?.prebook, p.response_time?.prebook)}
               <tr><td>Cancelled rides</td>
                   <td class="num">${fmtNum(c.cancelled_jobs)}</td>

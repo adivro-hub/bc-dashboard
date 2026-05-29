@@ -147,20 +147,22 @@ export default async function handler(req, res) {
       }
       const [vRow] = await query(vSql, vParams);
 
-      // 4. Avg response time (minutes) split by urgency, restricted to
-      // DONE jobs with a non-null response_time. Same fleet proxy as
-      // unique_vehicles.
+      // 4. Avg ON-WAY time (minutes) split by urgency, restricted to DONE
+      // jobs with a non-null on_way_time. This is the time the driver
+      // spent driving toward the pickup AFTER accepting the job — not
+      // booking-to-acceptance. Same fleet proxy as unique_vehicles.
       let rtSql, rtParams;
       const rtBase = `
         SELECT upper(urgency) AS urg,
-               EXTRACT(EPOCH FROM AVG(response_time))/60.0       AS avg_min,
+               EXTRACT(EPOCH FROM AVG(on_way_time))/60.0         AS avg_min,
                EXTRACT(EPOCH FROM PERCENTILE_CONT(0.5)
-                 WITHIN GROUP (ORDER BY response_time))/60.0     AS median_min,
+                 WITHIN GROUP (ORDER BY on_way_time))/60.0       AS median_min,
                COUNT(*)::int                                     AS n
           FROM job_analogue
          WHERE job_date BETWEEN $1::date AND $2::date
            AND status = 'DONE'
-           AND response_time IS NOT NULL
+           AND on_way_time IS NOT NULL
+           AND on_way_time > INTERVAL '0'
            AND upper(urgency) IN ('ASAP','PREBOOK')`;
       if (f.vehicles.kind === 'services') {
         rtSql = rtBase + ` AND service = ANY($3::text[]) GROUP BY upper(urgency)`;
