@@ -1,40 +1,49 @@
 /* GET /api/fleet-bundle?from=YYYY-MM-DD&to=YYYY-MM-DD
  *
- * Aggregated KPIs for a small whitelist of fleets in a single round trip:
+ * Aggregated KPIs for a whitelist of fleets in a single round trip:
  *
  *   {
- *     "Bucharest BlackCab Fleet": {
- *       jobs, hours, sales, earnings, unique_vehicles
- *     },
- *     "Bucharest Select Fleet": { ... },
- *     ...
+ *     "Bucharest BlackCab Fleet": { jobs, hours, sales, earnings, unique_vehicles, ... },
+ *     "Bucharest Select Fleet":   { ... },
+ *     "Bucharest (total)":        { ... },
  *   }
  *
  * Numbers come from two sources:
  *
  *   * jobs / sales / earnings / hours -> income_structure_fleet +
- *     income_structure_login_time (the daily roll-ups). Authoritative
- *     because that's how the operator's own reporting attributes a job
- *     to a fleet.
+ *     income_structure_login_time (the daily roll-ups). Authoritative.
  *
  *   * unique_vehicles -> COUNT(DISTINCT vehicle_reg_number) on
- *     job_analogue, restricted by service. job_analogue has no `fleet`
- *     column, so service is used as a proxy:
+ *     job_analogue. job_analogue has no `fleet` column, so:
  *         BlackCab Fleet  <- service IN ('BlackCab', 'BlackCab 7')
  *         Select Fleet    <- service =  'Select'
- *     Tagged `unique_vehicles_proxy` in the response so consumers know it's
- *     an approximation.
+ *         Bucharest total <- pick_up_city LIKE 'Bucharest%'
+ *     Tagged `unique_vehicles_proxy:true` in the response so the UI
+ *     can mark these cells as approximate.
  */
 import { query, ok, bad, parseDateRange, requireAuth } from './_db.js';
 
+// Each entry:
+//   match.kind = 'exact' | 'pattern'   — for income_structure_fleet/login_time
+//   match.value                        — fleet name or LIKE pattern
+//   vehicles.kind = 'services' | 'city' — for job_analogue lookup
+//   vehicles.value                     — array of services or city LIKE pattern
 const FLEETS = [
   {
     name: 'Bucharest BlackCab Fleet',
-    services: ['BlackCab', 'BlackCab 7'],
+    match:    { kind: 'exact',   value: 'Bucharest BlackCab Fleet' },
+    vehicles: { kind: 'services', value: ['BlackCab', 'BlackCab 7'] },
   },
   {
     name: 'Bucharest Select Fleet',
-    services: ['Select'],
+    match:    { kind: 'exact',    value: 'Bucharest Select Fleet' },
+    vehicles: { kind: 'services', value: ['Select'] },
+  },
+  {
+    name: 'Bucharest (total)',
+    match:    { kind: 'pattern', value: 'Bucharest%' },
+    vehicles: { kind: 'city',    value: 'Bucharest%' },
+    is_total: true,
   },
 ];
 
@@ -47,87 +56,72 @@ export default async function handler(req, res) {
   catch (e) { return bad(res, 400, e.message); }
 
   try {
-    // 1) Fleet-keyed jobs/sales/earnings from income_structure_fleet.
-    const fleetRows = await query(
-      `SELECT "Fleet" AS k,
-              COALESCE(SUM("Jobs"),    0)::float AS jobs,
-              COALESCE(SUM("Total"),   0)::float AS total,
-              COALESCE(SUM("Earnings"),0)::float AS earnings
-         FROM income_structure_fleet
-        WHERE "Date" BETWEEN $1::date AND $2::date
-          AND "Fleet" IS NOT NULL
-          AND lower(trim("Fleet")) <> 'total'
-          AND "Fleet" = ANY($3::text[])
-        GROUP BY "Fleet"`,
-      [from, to, FLEETS.map(f => f.name)]
-    );
-
-    // 2) Login hours from income_structure_login_time.
-    const hourRows = await query(
-      `SELECT "Fleet" AS k,
-              COALESCE(SUM("Hours"), 0)::float AS hours
-         FROM income_structure_login_time
-        WHERE "Date" BETWEEN $1::date AND $2::date
-          AND "Fleet" = ANY($2::text[])
-        GROUP BY "Fleet"`,
-      [from, to, FLEETS.map(f => f.name)]
-    ).catch(async () => {
-      // Older deploys might have had different param ordering; do it positional.
-      return query(
-        `SELECT "Fleet" AS k,
-                COALESCE(SUM("Hours"), 0)::float AS hours
-           FROM income_structure_login_time
-          WHERE "Date" BETWEEN $1::date AND $2::date
-            AND "Fleet" = ANY($3::text[])
-          GROUP BY "Fleet"`,
-        [from, to, FLEETS.map(f => f.name)]
-      );
-    });
-
-    // 3) Unique vehicles per fleet (proxy via service whitelist).
-    // We run one job_analogue query per fleet so the IN-list is small and
-    // the planner can use an index on (job_date, service).
-    const vehicleByFleet = {};
-    await Promise.all(FLEETS.map(async f => {
-      const rows = await query(
-        `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
-           FROM job_analogue
-          WHERE job_date BETWEEN $1::date AND $2::date
-            AND service = ANY($3::text[])
-            AND vehicle_reg_number IS NOT NULL
-            AND trim(vehicle_reg_number) <> ''`,
-        [from, to, f.services]
-      );
-      vehicleByFleet[f.name] = rows[0]?.n || 0;
-    }));
-
-    // Stitch it all together. Fleets the user asked for that don't appear
-    // in income_structure_fleet still get zeroed entries so the UI can
-    // render a row.
     const result = {};
-    const fleetMap = new Map(fleetRows.map(r => [r.k, r]));
-    const hourMap  = new Map(hourRows.map(r => [r.k, r]));
-    for (const f of FLEETS) {
-      const fr = fleetMap.get(f.name);
-      const hr = hourMap.get(f.name);
-      const jobs = fr?.jobs || 0;
-      const hours = hr?.hours || 0;
+    await Promise.all(FLEETS.map(async f => {
+      // 1. Sales / jobs / earnings from income_structure_fleet
+      const fleetSql = f.match.kind === 'exact'
+        ? `SELECT COALESCE(SUM("Jobs"),0)::float    AS jobs,
+                  COALESCE(SUM("Total"),0)::float   AS total,
+                  COALESCE(SUM("Earnings"),0)::float AS earnings
+             FROM income_structure_fleet
+            WHERE "Date" BETWEEN $1::date AND $2::date
+              AND "Fleet" = $3
+              AND lower(trim("Fleet")) <> 'total'`
+        : `SELECT COALESCE(SUM("Jobs"),0)::float    AS jobs,
+                  COALESCE(SUM("Total"),0)::float   AS total,
+                  COALESCE(SUM("Earnings"),0)::float AS earnings
+             FROM income_structure_fleet
+            WHERE "Date" BETWEEN $1::date AND $2::date
+              AND "Fleet" LIKE $3
+              AND lower(trim("Fleet")) <> 'total'`;
+      const [fleetRow] = await query(fleetSql, [from, to, f.match.value]);
+
+      // 2. Login hours from income_structure_login_time
+      const hourSql = f.match.kind === 'exact'
+        ? `SELECT COALESCE(SUM("Hours"),0)::float AS hours
+             FROM income_structure_login_time
+            WHERE "Date" BETWEEN $1::date AND $2::date
+              AND "Fleet" = $3`
+        : `SELECT COALESCE(SUM("Hours"),0)::float AS hours
+             FROM income_structure_login_time
+            WHERE "Date" BETWEEN $1::date AND $2::date
+              AND "Fleet" LIKE $3`;
+      const [hourRow] = await query(hourSql, [from, to, f.match.value]);
+
+      // 3. Unique vehicles via job_analogue (proxy)
+      const vSql = f.vehicles.kind === 'services'
+        ? `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
+             FROM job_analogue
+            WHERE job_date BETWEEN $1::date AND $2::date
+              AND service = ANY($3::text[])
+              AND vehicle_reg_number IS NOT NULL
+              AND trim(vehicle_reg_number) <> ''`
+        : `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
+             FROM job_analogue
+            WHERE job_date BETWEEN $1::date AND $2::date
+              AND pick_up_city ILIKE $3
+              AND vehicle_reg_number IS NOT NULL
+              AND trim(vehicle_reg_number) <> ''`;
+      const [vRow] = await query(vSql, [from, to, f.vehicles.value]);
+
+      const jobs  = fleetRow?.jobs    || 0;
+      const hours = hourRow?.hours    || 0;
       result[f.name] = {
         jobs,
         hours,
-        sales:    fr?.total    || 0,
-        earnings: fr?.earnings || 0,
-        hours_per_ride:    jobs > 0 ? hours / jobs : null,
-        unique_vehicles:   vehicleByFleet[f.name] || 0,
+        sales:    fleetRow?.total    || 0,
+        earnings: fleetRow?.earnings || 0,
+        hours_per_ride:  jobs > 0 ? hours / jobs : null,
+        unique_vehicles: vRow?.n     || 0,
         unique_vehicles_proxy: true,
-        proxy_services: f.services,
+        is_total: !!f.is_total,
+        // Surface the proxy criteria so the UI tooltip can explain
+        proxy_services: f.vehicles.kind === 'services' ? f.vehicles.value : null,
+        proxy_city:     f.vehicles.kind === 'city'     ? f.vehicles.value : null,
       };
-    }
+    }));
 
-    ok(res, {
-      from, to,
-      fleets: result,
-    });
+    ok(res, { from, to, fleets: result });
   } catch (e) {
     console.error('fleet-bundle error', e);
     bad(res, 500, e.message);

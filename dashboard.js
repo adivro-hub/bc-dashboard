@@ -1134,17 +1134,24 @@ window.renderDashboard = function renderDashboard(){
       return hours / jobs;
     }
     host.innerHTML = '';
+    function proxyTooltip(c){
+      if (c.proxy_services) return `Proxy: distinct vehicle plates with service ∈ {${c.proxy_services.join(', ')}}`;
+      if (c.proxy_city)     return `Proxy: distinct vehicle plates with pick-up city LIKE "${c.proxy_city}"`;
+      return 'Proxy count';
+    }
     for (const name of fleets){
       const c = curBundle.fleets[name]  || {};
       const p = prevBundle.fleets[name] || {};
       const cHpr = c.hours_per_ride ?? rideRatio(c.hours, c.jobs);
       const pHpr = p.hours_per_ride ?? rideRatio(p.hours, p.jobs);
+      const cardClass = c.is_total ? 'card fleet-total' : 'card';
       host.insertAdjacentHTML('beforeend', `
-        <div class="card">
+        <div class="${cardClass}">
           <div class="row-head">
             <div><strong>${name}</strong>
               <span class="pill">${fmtRange(cur)}</span>
               <span class="pill" style="background:transparent">vs ${fmtRange(prev)}</span>
+              ${c.is_total ? '<span class="pill" style="background:var(--accent);color:#0b1020">TOTAL</span>' : ''}
             </div>
           </div>
           <table>
@@ -1165,7 +1172,7 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num muted">${pHpr == null ? '—' : pHpr.toFixed(2)}</td>
                   ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
               <tr><td>Unique vehicles
-                      <span class="muted" title="Proxy: distinct vehicle plates with service ∈ {${(c.proxy_services||[]).join(', ')}}">(proxy)</span></td>
+                      <span class="muted" title="${proxyTooltip(c)}">(proxy)</span></td>
                   <td class="num">${fmtNum(c.unique_vehicles)}</td>
                   <td class="num muted">${fmtNum(p.unique_vehicles)}</td>
                   ${deltaCell(c.unique_vehicles, p.unique_vehicles, fmtNum)}</tr>

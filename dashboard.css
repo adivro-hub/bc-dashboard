@@ -567,3 +567,11 @@ tbody tr:hover{background:rgba(245,204,30,.07)}
   .overlay-cta:hover,
   .period-type-btn:hover { filter: none; }
 }
+/* Bucharest total card on Fleets tab — spans both columns to stand out */
+.fleet-total{
+  border-color: var(--accent);
+  box-shadow: 0 8px 30px rgba(245,204,30,.10), var(--shadow);
+  grid-column: 1 / -1;
+}
+.fleet-total .row-head > div > strong{ color: var(--accent); }
+
