@@ -1211,10 +1211,27 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num muted">${fmtNum(p.hours)}</td>
                   ${deltaCell(c.hours, p.hours, fmtNum)}</tr>
               <tr><td>Unique vehicles
-                      <span class="muted" title="${proxyTooltip(c)}">(proxy)</span></td>
-                  <td class="num">${fmtNum(c.unique_vehicles)}</td>
-                  <td class="num muted">${fmtNum(p.unique_vehicles)}</td>
+                      <span class="muted" title="${proxyTooltip(c)} — only DONE jobs">(proxy)</span></td>
+                  <td class="num">${fmtNum(c.unique_vehicles)}
+                      ${c.unique_vehicles_total_rides
+                          ? `<span class="muted" style="font-size:11px"> (${fmtNum(c.unique_vehicles_total_rides)} rides total)</span>`
+                          : ''}
+                  </td>
+                  <td class="num muted">${fmtNum(p.unique_vehicles)}
+                      ${p.unique_vehicles_total_rides
+                          ? `<span style="font-size:11px"> (${fmtNum(p.unique_vehicles_total_rides)})</span>`
+                          : ''}
+                  </td>
                   ${deltaCell(c.unique_vehicles, p.unique_vehicles, fmtNum)}</tr>
+              ${(c.cross_fleet_vehicles || p.cross_fleet_vehicles) ? `
+              <tr><td>… also on other ${c.proxy_city ? 'cities' : 'services'}
+                      <span class="muted" title="Of the unique vehicles, how many ALSO did DONE rides outside this fleet's whitelist in the same period — and how many such rides">(?)</span></td>
+                  <td class="num">${fmtNum(c.cross_fleet_vehicles)}
+                      <span class="muted" style="font-size:11px"> (${fmtNum(c.cross_fleet_rides)} rides)</span></td>
+                  <td class="num muted">${fmtNum(p.cross_fleet_vehicles)}
+                      <span style="font-size:11px"> (${fmtNum(p.cross_fleet_rides)})</span></td>
+                  ${deltaCell(c.cross_fleet_vehicles, p.cross_fleet_vehicles, fmtNum)}</tr>
+              ` : ''}
               <tr><td>Hours / vehicle</td>
                   <td class="num">${fmtFloat(c.unique_vehicles ? c.hours/c.unique_vehicles : null)}</td>
                   <td class="num muted">${fmtFloat(p.unique_vehicles ? p.hours/p.unique_vehicles : null)}</td>

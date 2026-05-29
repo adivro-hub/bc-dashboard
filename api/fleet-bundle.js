@@ -114,35 +114,90 @@ export default async function handler(req, res) {
               AND "Fleet" LIKE $3`;
       const [hourRow] = await query(hourSql, [from, to, f.match.value]);
 
-      // 3. Unique vehicles via job_analogue (proxy)
-      // The job_analogue table has no fleet column. Three matching modes:
-      //   services  — service = ANY($3::text[])
-      //   city_list — trim(pick_up_city) = ANY($3::text[])  (case-insensitive)
-      //   city      — pick_up_city ILIKE $3                  (legacy single pattern)
+      // 3. Unique vehicles + their cross-service activity. status='DONE' on
+      // every count so a driver that only picked-and-cancelled doesn't show
+      // up. Uses a CTE to first find the fleet vehicles, then probe what
+      // OTHER rides those exact vehicles did in the same period.
       let vSql, vParams;
       if (f.vehicles.kind === 'services') {
-        vSql = `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
-                  FROM job_analogue
-                 WHERE job_date BETWEEN $1::date AND $2::date
-                   AND service = ANY($3::text[])
-                   AND vehicle_reg_number IS NOT NULL
-                   AND trim(vehicle_reg_number) <> ''`;
+        vSql = `
+          WITH fleet_vehicles AS (
+            SELECT DISTINCT vehicle_reg_number
+              FROM job_analogue
+             WHERE job_date BETWEEN $1::date AND $2::date
+               AND status = 'DONE'
+               AND service = ANY($3::text[])
+               AND vehicle_reg_number IS NOT NULL
+               AND trim(vehicle_reg_number) <> ''
+          )
+          SELECT
+            (SELECT COUNT(*)::int FROM fleet_vehicles) AS unique_n,
+            -- Total DONE rides by these vehicles across ALL services
+            (SELECT COUNT(*)::int FROM job_analogue ja
+               JOIN fleet_vehicles fv USING (vehicle_reg_number)
+              WHERE ja.job_date BETWEEN $1::date AND $2::date
+                AND ja.status = 'DONE') AS total_rides_n,
+            -- Of these vehicles, how many also did rides OUTSIDE the whitelist
+            (SELECT COUNT(DISTINCT ja.vehicle_reg_number)::int FROM job_analogue ja
+               JOIN fleet_vehicles fv USING (vehicle_reg_number)
+              WHERE ja.job_date BETWEEN $1::date AND $2::date
+                AND ja.status = 'DONE'
+                AND NOT (ja.service = ANY($3::text[]))) AS cross_fleet_vehicles_n,
+            -- Cross-fleet ride count (their DONE rides on services outside the whitelist)
+            (SELECT COUNT(*)::int FROM job_analogue ja
+               JOIN fleet_vehicles fv USING (vehicle_reg_number)
+              WHERE ja.job_date BETWEEN $1::date AND $2::date
+                AND ja.status = 'DONE'
+                AND NOT (ja.service = ANY($3::text[]))) AS cross_fleet_rides_n`;
         vParams = [from, to, f.vehicles.value];
       } else if (f.vehicles.kind === 'city_list') {
-        vSql = `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
-                  FROM job_analogue
-                 WHERE job_date BETWEEN $1::date AND $2::date
-                   AND lower(trim(pick_up_city)) = ANY($3::text[])
-                   AND vehicle_reg_number IS NOT NULL
-                   AND trim(vehicle_reg_number) <> ''`;
+        vSql = `
+          WITH fleet_vehicles AS (
+            SELECT DISTINCT vehicle_reg_number
+              FROM job_analogue
+             WHERE job_date BETWEEN $1::date AND $2::date
+               AND status = 'DONE'
+               AND lower(trim(pick_up_city)) = ANY($3::text[])
+               AND vehicle_reg_number IS NOT NULL
+               AND trim(vehicle_reg_number) <> ''
+          )
+          SELECT
+            (SELECT COUNT(*)::int FROM fleet_vehicles) AS unique_n,
+            (SELECT COUNT(*)::int FROM job_analogue ja
+               JOIN fleet_vehicles fv USING (vehicle_reg_number)
+              WHERE ja.job_date BETWEEN $1::date AND $2::date
+                AND ja.status = 'DONE') AS total_rides_n,
+            -- For the city-based total card, 'cross-fleet' = rides outside Bucharest+Ilfov
+            (SELECT COUNT(DISTINCT ja.vehicle_reg_number)::int FROM job_analogue ja
+               JOIN fleet_vehicles fv USING (vehicle_reg_number)
+              WHERE ja.job_date BETWEEN $1::date AND $2::date
+                AND ja.status = 'DONE'
+                AND NOT (lower(trim(ja.pick_up_city)) = ANY($3::text[]))) AS cross_fleet_vehicles_n,
+            (SELECT COUNT(*)::int FROM job_analogue ja
+               JOIN fleet_vehicles fv USING (vehicle_reg_number)
+              WHERE ja.job_date BETWEEN $1::date AND $2::date
+                AND ja.status = 'DONE'
+                AND NOT (lower(trim(ja.pick_up_city)) = ANY($3::text[]))) AS cross_fleet_rides_n`;
         vParams = [from, to, f.vehicles.value.map(s => s.toLowerCase().trim())];
       } else {
-        vSql = `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
-                  FROM job_analogue
-                 WHERE job_date BETWEEN $1::date AND $2::date
-                   AND pick_up_city ILIKE $3
-                   AND vehicle_reg_number IS NOT NULL
-                   AND trim(vehicle_reg_number) <> ''`;
+        vSql = `
+          WITH fleet_vehicles AS (
+            SELECT DISTINCT vehicle_reg_number
+              FROM job_analogue
+             WHERE job_date BETWEEN $1::date AND $2::date
+               AND status = 'DONE'
+               AND pick_up_city ILIKE $3
+               AND vehicle_reg_number IS NOT NULL
+               AND trim(vehicle_reg_number) <> ''
+          )
+          SELECT
+            (SELECT COUNT(*)::int FROM fleet_vehicles) AS unique_n,
+            (SELECT COUNT(*)::int FROM job_analogue ja
+               JOIN fleet_vehicles fv USING (vehicle_reg_number)
+              WHERE ja.job_date BETWEEN $1::date AND $2::date
+                AND ja.status = 'DONE') AS total_rides_n,
+            0::int AS cross_fleet_vehicles_n,
+            0::int AS cross_fleet_rides_n`;
         vParams = [from, to, f.vehicles.value];
       }
       const [vRow] = await query(vSql, vParams);
@@ -212,8 +267,17 @@ export default async function handler(req, res) {
         sales:    fleetRow?.total    || 0,
         earnings: fleetRow?.earnings || 0,
         hours_per_ride:  jobs > 0 ? hours / jobs : null,
-        unique_vehicles: vRow?.n     || 0,
+        unique_vehicles: vRow?.unique_n || 0,
         unique_vehicles_proxy: true,
+        // Total DONE rides by those exact vehicles, across every service —
+        // this tells you how busy the fleet's vehicles really were (incl.
+        // when they did rides for OTHER fleets too).
+        unique_vehicles_total_rides: vRow?.total_rides_n || 0,
+        // Of the fleet's vehicles, how many also did rides outside the
+        // fleet's whitelist (other services for service-based cards, or
+        // outside Bucharest+Ilfov for the city-based total).
+        cross_fleet_vehicles: vRow?.cross_fleet_vehicles_n || 0,
+        cross_fleet_rides:    vRow?.cross_fleet_rides_n    || 0,
         // New: split response time
         response_time: {
           asap:    byUrg.ASAP    ? { avg_min: byUrg.ASAP.avg_min,    median_min: byUrg.ASAP.median_min,    n: byUrg.ASAP.n }    : null,
