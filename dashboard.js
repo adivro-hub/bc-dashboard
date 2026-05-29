@@ -1090,4 +1090,96 @@ window.renderDashboard = function renderDashboard(){
         </div>`);
     });
   }
+
+  // ---------- FLEETS TAB (Bucharest BlackCab + Select) ----------
+  // Two calls in parallel — one per period — then render side-by-side cards
+  // with KPI rows comparing the same fleet's current vs previous values.
+  (async function renderFleets(){
+    const host = document.getElementById('fleetCards');
+    if (!host) return;
+    function fmtRange(p){ return p ? `${p.period_from} → ${p.period_to}` : '—'; }
+    const curRange  = { from: cur.period_from,  to: cur.period_to  };
+    const prevRange = { from: prev.period_from, to: prev.period_to };
+    let curBundle, prevBundle;
+    try {
+      const [a, b] = await Promise.all([
+        fetch(`/api/fleet-bundle?from=${curRange.from}&to=${curRange.to}`,   { credentials:'same-origin' }),
+        fetch(`/api/fleet-bundle?from=${prevRange.from}&to=${prevRange.to}`, { credentials:'same-origin' }),
+      ]);
+      if (!a.ok) throw new Error('current ' + a.status);
+      if (!b.ok) throw new Error('previous ' + b.status);
+      curBundle  = await a.json();
+      prevBundle = await b.json();
+    } catch (e) {
+      host.innerHTML = `<div class="card empty-state">Could not load fleet data: ${e.message}</div>`;
+      return;
+    }
+    const fleets = Object.keys(curBundle.fleets);
+    if (!fleets.length){
+      document.getElementById('fleetEmpty').style.display = '';
+      return;
+    }
+    function fmtNum(v){ return v == null ? '—' : Number(v).toLocaleString('en-US'); }
+    function fmtRon(v){ return v == null ? '—' : Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function deltaCell(c, p, fmt){
+      if (p == null && c == null) return '<td class="num muted">—</td>';
+      const diff = (c || 0) - (p || 0);
+      const pct  = p ? (diff / p) * 100 : 0;
+      const cls  = Math.abs(diff) < 0.005 ? 'muted' : (diff >= 0 ? 'pos' : 'neg');
+      const arrow = diff >= 0 ? '▲' : '▼';
+      return `<td class="num ${cls}">${arrow} ${(diff>=0?'+':'')}${pct.toFixed(1)}%</td>`;
+    }
+    function rideRatio(hours, jobs){
+      if (!jobs) return null;
+      return hours / jobs;
+    }
+    host.innerHTML = '';
+    for (const name of fleets){
+      const c = curBundle.fleets[name]  || {};
+      const p = prevBundle.fleets[name] || {};
+      const cHpr = c.hours_per_ride ?? rideRatio(c.hours, c.jobs);
+      const pHpr = p.hours_per_ride ?? rideRatio(p.hours, p.jobs);
+      host.insertAdjacentHTML('beforeend', `
+        <div class="card">
+          <div class="row-head">
+            <div><strong>${name}</strong>
+              <span class="pill">${fmtRange(cur)}</span>
+              <span class="pill" style="background:transparent">vs ${fmtRange(prev)}</span>
+            </div>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Metric</th><th>Current</th><th>Previous</th><th>Δ %</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>Online hours</td>
+                  <td class="num">${fmtNum(c.hours)}</td>
+                  <td class="num muted">${fmtNum(p.hours)}</td>
+                  ${deltaCell(c.hours, p.hours, fmtNum)}</tr>
+              <tr><td>Rides (jobs)</td>
+                  <td class="num">${fmtNum(c.jobs)}</td>
+                  <td class="num muted">${fmtNum(p.jobs)}</td>
+                  ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
+              <tr><td>Hours / ride</td>
+                  <td class="num">${cHpr == null ? '—' : cHpr.toFixed(2)}</td>
+                  <td class="num muted">${pHpr == null ? '—' : pHpr.toFixed(2)}</td>
+                  ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
+              <tr><td>Unique vehicles
+                      <span class="muted" title="Proxy: distinct vehicle plates with service ∈ {${(c.proxy_services||[]).join(', ')}}">(proxy)</span></td>
+                  <td class="num">${fmtNum(c.unique_vehicles)}</td>
+                  <td class="num muted">${fmtNum(p.unique_vehicles)}</td>
+                  ${deltaCell(c.unique_vehicles, p.unique_vehicles, fmtNum)}</tr>
+              <tr><td>Sales (RON)</td>
+                  <td class="num">${fmtRon(c.sales)}</td>
+                  <td class="num muted">${fmtRon(p.sales)}</td>
+                  ${deltaCell(c.sales, p.sales, fmtRon)}</tr>
+              <tr><td>Earnings (RON)</td>
+                  <td class="num">${fmtRon(c.earnings)}</td>
+                  <td class="num muted">${fmtRon(p.earnings)}</td>
+                  ${deltaCell(c.earnings, p.earnings, fmtRon)}</tr>
+            </tbody>
+          </table>
+        </div>`);
+    }
+  })();
 };

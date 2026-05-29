@@ -21,6 +21,7 @@
   <div class="tabs" id="tabs">
     <button data-tab="overview" class="active">Overview</button>
     <button data-tab="ops">Operational KPIs</button>
+    <button data-tab="fleets">Fleets</button>
   </div>
 
   <div class="view active" data-view="overview">
@@ -253,6 +254,23 @@
       <strong>Fulfilment rate</strong> = DONE ÷ (DONE + CANCELLED).
     </p>
   </div><!-- /view-ops -->
+
+  <div class="view" data-view="fleets">
+    <h2>Bucharest fleets — BlackCab &amp; Select</h2>
+    <p class="sub" style="margin-top:-8px;margin-bottom:18px">
+      Per-fleet operational snapshot for the two main Bucharest fleets.
+      <strong>Hours, rides, sales and earnings</strong> come from the
+      operator's own per-fleet daily roll-ups (authoritative).
+      <strong>Unique vehicles</strong> is a proxy — `job_analogue` has no
+      fleet column, so it counts distinct vehicle plates by the fleet's
+      service whitelist (BlackCab Fleet ← service in {BlackCab, BlackCab 7};
+      Select Fleet ← service = Select).
+    </p>
+    <div class="grid panels" id="fleetCards"></div>
+    <p class="sub" id="fleetEmpty" style="display:none;margin-top:18px">
+      No data for either fleet in the selected period.
+    </p>
+  </div><!-- /view-fleets -->
 
   <footer class="page-footer">
     <button class="theme-toggle">🌙 Theme</button>
