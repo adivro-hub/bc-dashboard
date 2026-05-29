@@ -288,12 +288,21 @@ export default async function handler(req, res) {
 
       const jobs  = fleetRow?.jobs    || 0;
       const hours = hourRow?.hours    || 0;
+      // Canonical "rides" for the card = DONE rides from job_analogue
+      // (same source as the ASAP/Prebook split + cancellation rates).
+      // We deliberately *don't* use income_structure_fleet's "Jobs" here,
+      // even though that view is authoritative, because the children of
+      // Service rides (ASAP done + Prebook done) come from job_analogue,
+      // and the user expects them to add up. The income_structure jobs
+      // and proxy done_jobs differ by ~5-10% (proxy whitelist is wider)
+      // and that mismatch shows on screen as kids overshooting parent.
+      const doneJobs = cancelRow?.done_n || 0;
       return [f.name, {
         jobs,
         hours,
         sales:    fleetRow?.total    || 0,
         earnings: fleetRow?.earnings || 0,
-        hours_per_ride:  jobs > 0 ? hours / jobs : null,
+        hours_per_ride:  doneJobs > 0 ? hours / doneJobs : null,
         unique_vehicles: vRow?.unique_n || 0,
         unique_vehicles_proxy: true,
         // Total DONE rides by those exact vehicles, across every service —

@@ -1188,7 +1188,10 @@ window.renderDashboard = function renderDashboard(){
     // Auto-diagnose the rides vs availability story. Returns { cls, text }.
     // Thresholds: rides/hours = ±5%, cancellation rate = ±1 percentage point.
     function diagnoseFleet(c, p){
-      const ridesD  = p.jobs  ? (c.jobs  - p.jobs)  / p.jobs  : null;
+      // Rides = job_analogue DONE count (same source as ASAP/Prebook split).
+      const cRides = c.done_jobs ?? c.jobs ?? 0;
+      const pRides = p.done_jobs ?? p.jobs ?? 0;
+      const ridesD  = pRides ? (cRides - pRides) / pRides : null;
       const hoursD  = p.hours ? (c.hours - p.hours) / p.hours : null;
       const cancelD = (c.cancellation_rate || 0) - (p.cancellation_rate || 0);
       if (ridesD == null || hoursD == null){
@@ -1247,9 +1250,19 @@ window.renderDashboard = function renderDashboard(){
     for (const name of fleets){
       const c = curBundle.fleets[name]  || {};
       const p = prevBundle.fleets[name] || {};
-      const cHpr = c.hours_per_ride ?? rideRatio(c.hours, c.jobs);
-      const pHpr = p.hours_per_ride ?? rideRatio(p.hours, p.jobs);
+      // Hours / ride uses the same DONE-rides denominator as Service rides
+      // so the math stays consistent on the card.
+      const cRides = c.done_jobs ?? c.jobs ?? 0;
+      const pRides = p.done_jobs ?? p.jobs ?? 0;
+      const cHpr = c.hours_per_ride ?? rideRatio(c.hours, cRides);
+      const pHpr = p.hours_per_ride ?? rideRatio(p.hours, pRides);
       const diag = diagnoseFleet(c, p);
+      // Residual DONE rides with urgency outside ASAP/PREBOOK (NULL or other).
+      // Usually 0; surface a sub-row only when it's non-zero so the parent
+      // total still reconciles visually.
+      const cOther = Math.max(0, cRides - (c.asap_done || 0) - (c.prebook_done || 0));
+      const pOther = Math.max(0, pRides - (p.asap_done || 0) - (p.prebook_done || 0));
+      const showOther = cOther > 0 || pOther > 0;
 
       const cardClass = c.is_total ? 'card fleet-total' : 'card';
       host.insertAdjacentHTML('beforeend', `
@@ -1286,20 +1299,26 @@ window.renderDashboard = function renderDashboard(){
 
               <tr class="group-head"><td colspan="4">Volume &amp; Revenue</td></tr>
               <tr><td>Service rides
-                      <span class="muted" title="Mașinile din flota BlackCab deservesc și serviciul Select, nu și vice versa.">(?)</span></td>
-                  <td class="num"><strong>${fmtNum(c.jobs)}</strong></td>
-                  <td class="num muted">${fmtNum(p.jobs)}</td>
-                  ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
+                      <span class="muted" title="DONE rides în job_analogue pentru serviciile flotei. Mașinile din flota BlackCab deservesc și serviciul Select, nu și vice versa.">(?)</span></td>
+                  <td class="num"><strong>${fmtNum(cRides)}</strong></td>
+                  <td class="num muted">${fmtNum(pRides)}</td>
+                  ${deltaCell(cRides, pRides, fmtNum)}</tr>
               <tr><td style="padding-left:24px" class="muted">— ASAP done
-                      <span class="muted" title="DONE rides with urgency = ASAP — dispatched on real-time driver availability. Source: job_analogue with the fleet service whitelist; small variance vs the authoritative Service rides total is normal.">(?)</span></td>
+                      <span class="muted" title="DONE rides cu urgency = ASAP — alocare în timp real pe disponibilitatea șoferilor.">(?)</span></td>
                   <td class="num">${fmtNum(c.asap_done)}</td>
                   <td class="num muted">${fmtNum(p.asap_done)}</td>
                   ${deltaCell(c.asap_done, p.asap_done, fmtNum)}</tr>
               <tr><td style="padding-left:24px" class="muted">— Prebook done
-                      <span class="muted" title="DONE rides with urgency = PREBOOK — committed in advance.">(?)</span></td>
+                      <span class="muted" title="DONE rides cu urgency = PREBOOK — comandate în avans.">(?)</span></td>
                   <td class="num">${fmtNum(c.prebook_done)}</td>
                   <td class="num muted">${fmtNum(p.prebook_done)}</td>
                   ${deltaCell(c.prebook_done, p.prebook_done, fmtNum)}</tr>
+              ${showOther ? `
+              <tr><td style="padding-left:24px" class="muted">— Other
+                      <span class="muted" title="DONE rides fără urgency sau cu altă valoare decât ASAP/PREBOOK.">(?)</span></td>
+                  <td class="num">${fmtNum(cOther)}</td>
+                  <td class="num muted">${fmtNum(pOther)}</td>
+                  ${deltaCell(cOther, pOther, fmtNum)}</tr>` : ''}
               <tr><td>Sales (RON)</td>
                   <td class="num">${fmtRon(c.sales)}</td>
                   <td class="num muted">${fmtRon(p.sales)}</td>
@@ -1309,11 +1328,11 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num muted">${fmtRon(p.earnings)}</td>
                   ${deltaCell(c.earnings, p.earnings, fmtRon)}</tr>
               <tr><td>Avg price / ride (RON)</td>
-                  <td class="num">${c.jobs > 0 ? fmtRon(c.sales / c.jobs) : '—'}</td>
-                  <td class="num muted">${p.jobs > 0 ? fmtRon(p.sales / p.jobs) : '—'}</td>
+                  <td class="num">${cRides > 0 ? fmtRon(c.sales / cRides) : '—'}</td>
+                  <td class="num muted">${pRides > 0 ? fmtRon(p.sales / pRides) : '—'}</td>
                   ${deltaCell(
-                    c.jobs > 0 ? c.sales / c.jobs : null,
-                    p.jobs > 0 ? p.sales / p.jobs : null,
+                    cRides > 0 ? c.sales / cRides : null,
+                    pRides > 0 ? p.sales / pRides : null,
                     fmtRon)}</tr>
 
               <tr class="group-head"><td colspan="4">Service quality</td></tr>
