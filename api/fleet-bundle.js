@@ -263,9 +263,11 @@ export default async function handler(req, res) {
           COUNT(*)::int                                                        AS total_n,
           COUNT(*) FILTER (WHERE status = 'DONE')::int                         AS done_n,
           COUNT(*) FILTER (WHERE status = 'CANCELLED')::int                    AS cancel_n,
-          COUNT(*) FILTER (
-            WHERE status = 'CANCELLED' AND cancel_reason ~* $4
-          )::int                                                               AS no_supply_n
+          COUNT(*) FILTER (WHERE status = 'CANCELLED' AND cancel_reason ~* $4)::int AS no_supply_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'ASAP')::int                 AS asap_total_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'ASAP'    AND status = 'CANCELLED')::int AS asap_cancel_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'PREBOOK')::int              AS prebook_total_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'PREBOOK' AND status = 'CANCELLED')::int AS prebook_cancel_n
           FROM job_analogue
          WHERE job_date BETWEEN $1::date AND $2::date`;
       if (f.vehicles.kind === 'services') {
@@ -313,6 +315,19 @@ export default async function handler(req, res) {
         cancellation_rate:   cancelRow?.total_n > 0
                                ? cancelRow.cancel_n / cancelRow.total_n
                                : null,
+        // Split by urgency. PREBOOK bookings cancel at a very different
+        // (lower) rate than ASAP requests dispatched on driver availability,
+        // so blending them hides the actual story.
+        asap_total:          cancelRow?.asap_total_n    || 0,
+        asap_cancelled:      cancelRow?.asap_cancel_n   || 0,
+        cancellation_rate_asap:    cancelRow?.asap_total_n > 0
+                                     ? cancelRow.asap_cancel_n / cancelRow.asap_total_n
+                                     : null,
+        prebook_total:       cancelRow?.prebook_total_n  || 0,
+        prebook_cancelled:   cancelRow?.prebook_cancel_n || 0,
+        cancellation_rate_prebook: cancelRow?.prebook_total_n > 0
+                                     ? cancelRow.prebook_cancel_n / cancelRow.prebook_total_n
+                                     : null,
         is_total: !!f.is_total,
         // Surface the proxy criteria so the UI tooltip can explain
         proxy_services: f.vehicles.kind === 'services'  ? f.vehicles.value : null,

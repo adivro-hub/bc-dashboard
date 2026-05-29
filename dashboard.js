@@ -1311,11 +1311,16 @@ window.renderDashboard = function renderDashboard(){
                        c.response_time?.asap,    p.response_time?.asap)}
               ${rtRow('Avg on-way time — Prebook',
                        c.response_time?.prebook, p.response_time?.prebook)}
-              <tr><td>Cancellation rate
-                      <span class="muted" title="CANCELLED / total bookings (every reservation in the period, regardless of status)">(?)</span></td>
-                  <td class="num"><strong>${fmtPct1(c.cancellation_rate)}</strong></td>
-                  <td class="num muted">${fmtPct1(p.cancellation_rate)}</td>
-                  ${deltaCellSwapped(c.cancellation_rate, p.cancellation_rate)}</tr>
+              <tr><td>Cancellation rate — ASAP
+                      <span class="muted" title="ASAP CANCELLED / ASAP total bookings. ASAP rides are dispatched on driver availability in real time, so this rate is much more sensitive to supply than the PREBOOK one.">(?)</span></td>
+                  <td class="num"><strong>${fmtPct1(c.cancellation_rate_asap)}</strong></td>
+                  <td class="num muted">${fmtPct1(p.cancellation_rate_asap)}</td>
+                  ${deltaCellSwapped(c.cancellation_rate_asap, p.cancellation_rate_asap)}</tr>
+              <tr><td>Cancellation rate — Prebook
+                      <span class="muted" title="PREBOOK CANCELLED / PREBOOK total bookings. Prebookings are committed in advance, so this rate is much lower than ASAP and tracks demand-side cancellations more than supply gaps.">(?)</span></td>
+                  <td class="num"><strong>${fmtPct1(c.cancellation_rate_prebook)}</strong></td>
+                  <td class="num muted">${fmtPct1(p.cancellation_rate_prebook)}</td>
+                  ${deltaCellSwapped(c.cancellation_rate_prebook, p.cancellation_rate_prebook)}</tr>
             </tbody>
           </table>
         </div>`);
