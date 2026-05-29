@@ -177,12 +177,14 @@ export default async function handler(req, res) {
       const rtRows = await query(rtSql, rtParams);
       const byUrg = Object.fromEntries(rtRows.map(r => [r.urg, r]));
 
-      // 5. Cancellation diagnostics: total CANCELLED, DONE, and the
-      // subset of cancellations attributable to lack of supply.
+      // 5. Cancellation diagnostics: total bookings, DONE, CANCELLED, and
+      // the subset of cancellations attributable to lack of supply.
+      // Cancellation rate uses ALL bookings as denominator (out of total).
       // Same fleet proxy as elsewhere.
       let cancelSql, cancelParams;
       const cancelBase = `
         SELECT
+          COUNT(*)::int                                                        AS total_n,
           COUNT(*) FILTER (WHERE status = 'DONE')::int                         AS done_n,
           COUNT(*) FILTER (WHERE status = 'CANCELLED')::int                    AS cancel_n,
           COUNT(*) FILTER (
@@ -218,11 +220,13 @@ export default async function handler(req, res) {
           prebook: byUrg.PREBOOK ? { avg_min: byUrg.PREBOOK.avg_min, median_min: byUrg.PREBOOK.median_min, n: byUrg.PREBOOK.n } : null,
         },
         // Diagnostics for correlating volume drops with supply/demand
+        total_bookings:      cancelRow?.total_n     || 0,
         done_jobs:           cancelRow?.done_n      || 0,
         cancelled_jobs:      cancelRow?.cancel_n    || 0,
         no_supply_cancels:   cancelRow?.no_supply_n || 0,
-        cancellation_rate:   (cancelRow?.done_n + cancelRow?.cancel_n) > 0
-                               ? cancelRow.cancel_n / (cancelRow.done_n + cancelRow.cancel_n)
+        // CANCELLED / total bookings (out of all reservations in the period)
+        cancellation_rate:   cancelRow?.total_n > 0
+                               ? cancelRow.cancel_n / cancelRow.total_n
                                : null,
         is_total: !!f.is_total,
         // Surface the proxy criteria so the UI tooltip can explain

@@ -1250,7 +1250,7 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num muted">${fmtNum(p.cancelled_jobs)}</td>
                   ${deltaCellSwapped(c.cancelled_jobs, p.cancelled_jobs)}</tr>
               <tr><td>Cancellation rate
-                      <span class="muted" title="CANCELLED / (DONE + CANCELLED) within the same fleet proxy">(?)</span></td>
+                      <span class="muted" title="CANCELLED / total bookings (every reservation in the period, regardless of status)">(?)</span></td>
                   <td class="num"><strong>${fmtPct1(c.cancellation_rate)}</strong></td>
                   <td class="num muted">${fmtPct1(p.cancellation_rate)}</td>
                   ${deltaCellSwapped(c.cancellation_rate, p.cancellation_rate)}</tr>
