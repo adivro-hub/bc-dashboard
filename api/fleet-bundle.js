@@ -66,6 +66,19 @@ const BUCHAREST_AREA_CITIES = [
 //   vehicles.value                     — array of services or city LIKE pattern
 const FLEETS = [
   {
+    // Headline card — always rendered first. Union of all Bucharest-
+    // prefixed fleets, with the cross-job_analogue proxy widened to the
+    // full whitelist of services the Bucharest fleets operate. Catches
+    // out-of-Bucharest rides done by Bucharest-fleet vehicles (Constanța,
+    // Brașov runs, Otopeni airport rides regardless of how the city is
+    // labelled, etc.) at the cost of also catching any non-Bucharest
+    // operations on those services (if any exist in the data).
+    name: 'Bucharest fleet (total)',
+    match:    { kind: 'pattern',   value: 'Bucharest%' },
+    vehicles: { kind: 'services',  value: BUCHAREST_FLEET_SERVICES },
+    is_total: true,
+  },
+  {
     // Bucharest BlackCab Fleet + Bucharest BlackCab CS Fleet rolled up.
     name: 'Bucharest BlackCab',
     match:    { kind: 'pattern', value: 'Bucharest BlackCab%' },
@@ -76,21 +89,6 @@ const FLEETS = [
     name: 'Bucharest Select',
     match:    { kind: 'pattern', value: 'Bucharest Select%' },
     vehicles: { kind: 'services', value: ['Select'] },
-  },
-  {
-    // Everything starting with Bucharest in the source fleet column.
-    // For unique-vehicles/response-time/cancellations the proxy filters by
-    // service whitelist instead of pick_up_city. job_analogue has no
-    // fleet column, so the closest "fleet only" approximation is the
-    // union of all services the Bucharest fleets operate. This catches
-    // out-of-Bucharest rides done by Bucharest-fleet vehicles (Constanța,
-    // Brașov runs, Otopeni airport rides regardless of how the city is
-    // labelled, etc.) at the cost of also catching any non-Bucharest
-    // operations on those services (if any exist in the data).
-    name: 'Bucharest fleet (total)',
-    match:    { kind: 'pattern',   value: 'Bucharest%' },
-    vehicles: { kind: 'services',  value: BUCHAREST_FLEET_SERVICES },
-    is_total: true,
   },
 ];
 
@@ -103,8 +101,12 @@ export default async function handler(req, res) {
   catch (e) { return bad(res, 400, e.message); }
 
   try {
-    const result = {};
-    await Promise.all(FLEETS.map(async f => {
+    // Collect each fleet's payload as a [name, data] pair via Promise.all,
+    // then Object.fromEntries — preserves FLEETS[] order in the response
+    // (Object.fromEntries respects iteration order). Just assigning into
+    // a shared object inside the .map callback used insertion-by-completion
+    // order, which let the Total card sometimes appear after BlackCab/Select.
+    const entries = await Promise.all(FLEETS.map(async f => {
       // 1. Sales / jobs / earnings from income_structure_fleet
       const fleetSql = f.match.kind === 'exact'
         ? `SELECT COALESCE(SUM("Jobs"),0)::float    AS jobs,
@@ -264,10 +266,12 @@ export default async function handler(req, res) {
           COUNT(*) FILTER (WHERE status = 'DONE')::int                         AS done_n,
           COUNT(*) FILTER (WHERE status = 'CANCELLED')::int                    AS cancel_n,
           COUNT(*) FILTER (WHERE status = 'CANCELLED' AND cancel_reason ~* $4)::int AS no_supply_n,
-          COUNT(*) FILTER (WHERE upper(urgency) = 'ASAP')::int                 AS asap_total_n,
-          COUNT(*) FILTER (WHERE upper(urgency) = 'ASAP'    AND status = 'CANCELLED')::int AS asap_cancel_n,
-          COUNT(*) FILTER (WHERE upper(urgency) = 'PREBOOK')::int              AS prebook_total_n,
-          COUNT(*) FILTER (WHERE upper(urgency) = 'PREBOOK' AND status = 'CANCELLED')::int AS prebook_cancel_n
+          COUNT(*) FILTER (WHERE upper(urgency) = 'ASAP')::int                                AS asap_total_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'ASAP'    AND status = 'CANCELLED')::int     AS asap_cancel_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'ASAP'    AND status = 'DONE')::int          AS asap_done_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'PREBOOK')::int                              AS prebook_total_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'PREBOOK' AND status = 'CANCELLED')::int     AS prebook_cancel_n,
+          COUNT(*) FILTER (WHERE upper(urgency) = 'PREBOOK' AND status = 'DONE')::int          AS prebook_done_n
           FROM job_analogue
          WHERE job_date BETWEEN $1::date AND $2::date`;
       if (f.vehicles.kind === 'services') {
@@ -284,7 +288,7 @@ export default async function handler(req, res) {
 
       const jobs  = fleetRow?.jobs    || 0;
       const hours = hourRow?.hours    || 0;
-      result[f.name] = {
+      return [f.name, {
         jobs,
         hours,
         sales:    fleetRow?.total    || 0,
@@ -317,14 +321,17 @@ export default async function handler(req, res) {
                                : null,
         // Split by urgency. PREBOOK bookings cancel at a very different
         // (lower) rate than ASAP requests dispatched on driver availability,
-        // so blending them hides the actual story.
+        // so blending them hides the actual story. DONE-counts let the UI
+        // split "Service rides" the same way.
         asap_total:          cancelRow?.asap_total_n    || 0,
         asap_cancelled:      cancelRow?.asap_cancel_n   || 0,
+        asap_done:           cancelRow?.asap_done_n     || 0,
         cancellation_rate_asap:    cancelRow?.asap_total_n > 0
                                      ? cancelRow.asap_cancel_n / cancelRow.asap_total_n
                                      : null,
         prebook_total:       cancelRow?.prebook_total_n  || 0,
         prebook_cancelled:   cancelRow?.prebook_cancel_n || 0,
+        prebook_done:        cancelRow?.prebook_done_n   || 0,
         cancellation_rate_prebook: cancelRow?.prebook_total_n > 0
                                      ? cancelRow.prebook_cancel_n / cancelRow.prebook_total_n
                                      : null,
@@ -333,8 +340,9 @@ export default async function handler(req, res) {
         proxy_services: f.vehicles.kind === 'services'  ? f.vehicles.value : null,
         proxy_city:     f.vehicles.kind === 'city'      ? f.vehicles.value : null,
         proxy_cities:   f.vehicles.kind === 'city_list' ? f.vehicles.value : null,
-      };
+      }];
     }));
+    const result = Object.fromEntries(entries);
 
     ok(res, { from, to, fleets: result });
   } catch (e) {

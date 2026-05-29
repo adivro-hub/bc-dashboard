@@ -1290,6 +1290,16 @@ window.renderDashboard = function renderDashboard(){
                   <td class="num"><strong>${fmtNum(c.jobs)}</strong></td>
                   <td class="num muted">${fmtNum(p.jobs)}</td>
                   ${deltaCell(c.jobs, p.jobs, fmtNum)}</tr>
+              <tr><td style="padding-left:24px" class="muted">— ASAP done
+                      <span class="muted" title="DONE rides with urgency = ASAP — dispatched on real-time driver availability. Source: job_analogue with the fleet service whitelist; small variance vs the authoritative Service rides total is normal.">(?)</span></td>
+                  <td class="num">${fmtNum(c.asap_done)}</td>
+                  <td class="num muted">${fmtNum(p.asap_done)}</td>
+                  ${deltaCell(c.asap_done, p.asap_done, fmtNum)}</tr>
+              <tr><td style="padding-left:24px" class="muted">— Prebook done
+                      <span class="muted" title="DONE rides with urgency = PREBOOK — committed in advance.">(?)</span></td>
+                  <td class="num">${fmtNum(c.prebook_done)}</td>
+                  <td class="num muted">${fmtNum(p.prebook_done)}</td>
+                  ${deltaCell(c.prebook_done, p.prebook_done, fmtNum)}</tr>
               <tr><td>Sales (RON)</td>
                   <td class="num">${fmtRon(c.sales)}</td>
                   <td class="num muted">${fmtRon(p.sales)}</td>
