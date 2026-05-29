@@ -588,3 +588,31 @@ tr.group-head td{
 }
 .fleet-total .row-head > div > strong{ color: var(--accent); }
 
+/* Auto-diagnostic line under each fleet card's title.
+   Colour-coded by the inferred reason for the volume change so the
+   viewer sees in one second whether a rides drop is a supply problem
+   (capacity), a demand problem, or healthy growth.
+   - stable      grey       — volume essentially flat
+   - supply      red        — rides drop tracks lower availability
+   - bottleneck  red-orange — hours flat but cancellations rising (drivers maxed out)
+   - demand      yellow     — rides drop with stable/higher availability
+   - mixed       orange     — partial supply + partial demand
+   - util        green      — better utilisation per hour
+   - growth      good-green — proportional rides + hours growth */
+.fleet-diag{
+  margin:10px 0 12px;
+  padding:8px 12px;
+  font-size:12px;line-height:1.45;
+  border-left:4px solid var(--muted);
+  background:var(--panel-2);
+  border-radius:6px;
+  color:var(--text);
+}
+.fleet-diag-stable    {border-left-color:var(--muted);color:var(--muted)}
+.fleet-diag-supply    {border-left-color:var(--bad)}
+.fleet-diag-bottleneck{border-left-color:#ff9a3c}
+.fleet-diag-demand    {border-left-color:#f5cc1e}
+.fleet-diag-mixed     {border-left-color:#ffb86b}
+.fleet-diag-util      {border-left-color:var(--good)}
+.fleet-diag-growth    {border-left-color:var(--good)}
+

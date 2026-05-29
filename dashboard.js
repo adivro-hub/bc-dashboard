@@ -1185,11 +1185,71 @@ window.renderDashboard = function renderDashboard(){
       const arrow = diff <= 0 ? '▼' : '▲';
       return `<td class="num ${cls}">${arrow} ${(diff>=0?'+':'')}${pct.toFixed(1)}%</td>`;
     }
+    // Auto-diagnose the rides vs availability story. Returns { cls, text }.
+    // Thresholds: rides/hours = ±5%, cancellation rate = ±1 percentage point.
+    function diagnoseFleet(c, p){
+      const ridesD  = p.jobs  ? (c.jobs  - p.jobs)  / p.jobs  : null;
+      const hoursD  = p.hours ? (c.hours - p.hours) / p.hours : null;
+      const cancelD = (c.cancellation_rate || 0) - (p.cancellation_rate || 0);
+      if (ridesD == null || hoursD == null){
+        return { cls: 'stable', text: 'Date insuficiente în perioada precedentă pentru diagnostic.' };
+      }
+      const R = 0.05;        // 5% threshold for rides / hours
+      const C = 0.01;        // 1 percentage-point for cancellation
+      const pct = v => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`;
+      const ppt = v => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)} pp`;
+      const cancelNote = Math.abs(cancelD) >= C ? `, anulări ${ppt(cancelD)}` : '';
+
+      // Stable volume
+      if (Math.abs(ridesD) < R){
+        return { cls: 'stable',
+          text: `Volum stabil (rides ${pct(ridesD)}, hours ${pct(hoursD)}${cancelNote}).` };
+      }
+      // Rides DOWN
+      if (ridesD < 0){
+        if (hoursD <= ridesD + 0.02){
+          return { cls: 'supply',
+            text: `Rides ${pct(ridesD)} — în linie cu scăderea disponibilității (Hours ${pct(hoursD)}${cancelNote}). Constrângere de capacitate.` };
+        }
+        if (hoursD < -R){
+          return { cls: 'mixed',
+            text: `Rides ${pct(ridesD)} cu Hours ${pct(hoursD)} (a scăzut mai puțin)${cancelNote} — parțial disponibilitate, parțial cerere.` };
+        }
+        if (Math.abs(hoursD) < R){
+          if (cancelD >= C){
+            return { cls: 'bottleneck',
+              text: `Rides ${pct(ridesD)} cu Hours ≈ stabil dar anulări ${ppt(cancelD)} — bottleneck pe șoferi (cererea depășește oferta în vârfuri).` };
+          }
+          return { cls: 'demand',
+            text: `Rides ${pct(ridesD)} cu Hours ${pct(hoursD)} (≈ stabil)${cancelNote} — problemă de cerere.` };
+        }
+        // Hours up while rides down
+        return { cls: 'demand',
+          text: `Rides ${pct(ridesD)} deși Hours ${pct(hoursD)} (în creștere)${cancelNote} — problemă clară de cerere.` };
+      }
+      // Rides UP
+      if (hoursD <= -R){
+        return { cls: 'util',
+          text: `Rides ${pct(ridesD)} deși Hours ${pct(hoursD)} — utilizare semnificativ mai bună.` };
+      }
+      if (Math.abs(hoursD) < R){
+        return { cls: 'util',
+          text: `Rides ${pct(ridesD)} cu Hours ${pct(hoursD)} (≈ stabil) — utilizare în creștere.` };
+      }
+      if (hoursD <= ridesD + 0.02){
+        return { cls: 'growth',
+          text: `Rides ${pct(ridesD)} cu Hours ${pct(hoursD)} — creștere sănătoasă (proporțională).` };
+      }
+      return { cls: 'mixed',
+        text: `Rides ${pct(ridesD)} cu Hours ${pct(hoursD)} (mai mult) — capacitate adăugată mai repede ca cererea.` };
+    }
+
     for (const name of fleets){
       const c = curBundle.fleets[name]  || {};
       const p = prevBundle.fleets[name] || {};
       const cHpr = c.hours_per_ride ?? rideRatio(c.hours, c.jobs);
       const pHpr = p.hours_per_ride ?? rideRatio(p.hours, p.jobs);
+      const diag = diagnoseFleet(c, p);
 
       const cardClass = c.is_total ? 'card fleet-total' : 'card';
       host.insertAdjacentHTML('beforeend', `
@@ -1201,6 +1261,7 @@ window.renderDashboard = function renderDashboard(){
               ${c.is_total ? '<span class="pill" style="background:var(--accent);color:#0b1020">TOTAL</span>' : ''}
             </div>
           </div>
+          <div class="fleet-diag fleet-diag-${diag.cls}">${diag.text}</div>
           <table>
             <thead><tr>
               <th>Metric</th><th>Current</th><th>Previous</th><th>Δ %</th>
