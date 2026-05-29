@@ -1266,18 +1266,17 @@ window.renderDashboard = function renderDashboard(){
 
       const cardClass = c.is_total ? 'card fleet-total' : 'card';
 
-      // KPI tile row — shown only on the Total card. The user picked these
-      // four as the headline metrics for the rolled-up Bucharest fleet:
-      //   Online hours, Service rides (+ ASAP/Prebook breakdown), and
-      //   Cancellation rate split by urgency.
-      // Lower-is-better delta for cancellation tiles (swapped colour).
+      // KPI tile row — shown only on the Total card. Headline metrics for
+      // the rolled-up BlackCab + Select fleet:
+      //   Online hours, Service rides (ASAP+Prebook 2-in-1), Cancellation
+      //   rate (ASAP+Prebook 2-in-1, lower-is-better), Sales.
       const kpiBlock = c.is_total ? (() => {
+        // Single-metric tile with a top-level delta pill.
         function tile(label, c_, p_, fmt, lowerIsBetter = false){
           const cv = c_ ?? 0, pv = p_ ?? 0;
           const diff = cv - pv;
           const pct  = pv ? (diff / pv) * 100 : 0;
           const flat = Math.abs(pct) < 0.05;
-          // For lowerIsBetter, an INCREASE is bad (red ▼ logic flipped)
           const goodDir = lowerIsBetter ? diff <= 0 : diff >= 0;
           const cls = flat ? 'flat' : (goodDir ? 'up' : 'down');
           const arrow = flat ? '■' : (diff >= 0 ? '▲' : '▼');
@@ -1288,43 +1287,54 @@ window.renderDashboard = function renderDashboard(){
             <span class="delta ${cls}">${arrow} ${(pct>=0?'+':'')}${pct.toFixed(1)}%</span>
           </div>`;
         }
-        // Service rides tile shows the parent DONE total + an inline
-        // ASAP / Prebook breakdown line so the urgency split is visible
-        // without forcing a second row of tiles.
-        const ridesTile = (() => {
-          const cv = cRides, pv = pRides;
-          const diff = cv - pv;
-          const pct = pv ? (diff / pv) * 100 : 0;
+        // Compact inline delta pill used inside split tiles.
+        // lowerIsBetter flips the colour but the arrow still follows
+        // the actual direction of change (▲ for up, ▼ for down).
+        function inlineDelta(cv, pv, lowerIsBetter = false){
+          const diff = (cv || 0) - (pv || 0);
+          const pct  = pv ? (diff / pv) * 100 : 0;
           const flat = Math.abs(pct) < 0.05;
-          const cls = flat ? 'flat' : (diff >= 0 ? 'up' : 'down');
+          const goodDir = lowerIsBetter ? diff <= 0 : diff >= 0;
+          const cls  = flat ? 'flat' : (goodDir ? 'up' : 'down');
           const arrow = flat ? '■' : (diff >= 0 ? '▲' : '▼');
+          return `<span class="delta ${cls}" style="margin-top:0;padding:1px 6px;font-size:11px">${arrow} ${(pct>=0?'+':'')}${pct.toFixed(1)}%</span>`;
+        }
+        // Two-in-one tile: shows ASAP and Prebook side-by-side with
+        // independent deltas. They move differently (ASAP tracks supply,
+        // Prebook tracks demand commitments), so blending them hides
+        // the real story.
+        function splitTile(label, cAsap, pAsap, cPre, pPre, fmt, lowerIsBetter = false){
           return `<div class="card kpi">
-            <div class="label">Service rides</div>
-            <div class="value num">${fmtNum(cv)}</div>
-            <div class="prev num">prev ${fmtNum(pv)}</div>
-            <div class="prev num" style="margin-top:6px;line-height:1.5">
-              ASAP <strong style="color:var(--text)">${fmtNum(c.asap_done)}</strong>
-              <span class="muted">· prev ${fmtNum(p.asap_done)}</span><br>
-              Prebook <strong style="color:var(--text)">${fmtNum(c.prebook_done)}</strong>
-              <span class="muted">· prev ${fmtNum(p.prebook_done)}</span>
+            <div class="label">${label}</div>
+            <div style="margin-top:8px;line-height:1.7">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <span><span class="muted" style="font-size:12px">ASAP</span>
+                  <strong class="num" style="font-size:18px">${fmt(cAsap ?? 0)}</strong>
+                  <span class="muted" style="font-size:11px">· prev ${fmt(pAsap ?? 0)}</span></span>
+                ${inlineDelta(cAsap, pAsap, lowerIsBetter)}
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px">
+                <span><span class="muted" style="font-size:12px">Prebook</span>
+                  <strong class="num" style="font-size:18px">${fmt(cPre ?? 0)}</strong>
+                  <span class="muted" style="font-size:11px">· prev ${fmt(pPre ?? 0)}</span></span>
+                ${inlineDelta(cPre, pPre, lowerIsBetter)}
+              </div>
             </div>
-            <span class="delta ${cls}">${arrow} ${(pct>=0?'+':'')}${pct.toFixed(1)}%</span>
           </div>`;
-        })();
+        }
+        const pctFmt = v => (v * 100).toFixed(1) + '%';
         return `
           <div class="grid kpis" style="margin:12px 0 4px">
             ${tile('Online hours', c.hours, p.hours, fmtNum)}
-            ${ridesTile}
-            ${tile('Cancellation rate — ASAP',
-                    (c.cancellation_rate_asap || 0) * 100,
-                    (p.cancellation_rate_asap || 0) * 100,
-                    v => v.toFixed(1) + '%',
-                    true)}
-            ${tile('Cancellation rate — Prebook',
-                    (c.cancellation_rate_prebook || 0) * 100,
-                    (p.cancellation_rate_prebook || 0) * 100,
-                    v => v.toFixed(1) + '%',
-                    true)}
+            ${splitTile('Service rides',
+                        c.asap_done, p.asap_done,
+                        c.prebook_done, p.prebook_done,
+                        fmtNum)}
+            ${splitTile('Cancellation rate',
+                        c.cancellation_rate_asap, p.cancellation_rate_asap,
+                        c.cancellation_rate_prebook, p.cancellation_rate_prebook,
+                        pctFmt, true)}
+            ${tile('Sales (RON)', c.sales, p.sales, fmtRon)}
           </div>`;
       })() : '';
 
