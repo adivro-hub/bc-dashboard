@@ -1136,7 +1136,12 @@ window.renderDashboard = function renderDashboard(){
     host.innerHTML = '';
     function proxyTooltip(c){
       if (c.proxy_services) return `Proxy: distinct vehicle plates with service ∈ {${c.proxy_services.join(', ')}}`;
-      if (c.proxy_city)     return `Proxy: distinct vehicle plates with pick-up city LIKE "${c.proxy_city}"`;
+      if (c.proxy_cities && c.proxy_cities.length){
+        const sample = c.proxy_cities.slice(0, 6).join(', ');
+        const more = c.proxy_cities.length > 6 ? ` +${c.proxy_cities.length - 6} more` : '';
+        return `Proxy: distinct vehicle plates with pick-up city ∈ {${sample}${more}}`;
+      }
+      if (c.proxy_city) return `Proxy: distinct vehicle plates with pick-up city LIKE "${c.proxy_city}"`;
       return 'Proxy count';
     }
     function fmtMin(v){ return v == null ? '—' : `${Number(v).toFixed(1)} min`; }

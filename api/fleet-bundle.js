@@ -23,6 +23,25 @@
  */
 import { query, ok, bad, parseDateRange, requireAuth } from './_db.js';
 
+// Bucharest + Ilfov county localities served by the Bucharest fleet.
+// pick_up_city in job_analogue gets matched against this list with ILIKE +
+// trim, so it survives 'Sector 1', 'Otopeni, Ilfov', accents, etc.
+const BUCHAREST_AREA_CITIES = [
+  // Bucharest itself (any sector / variation)
+  'Bucharest', 'București', 'Bucuresti',
+  // Ilfov county catch-all
+  'Ilfov',
+  // Towns and communes in Ilfov
+  'Otopeni', 'Voluntari', 'Pipera', 'Mogoșoaia', 'Mogosoaia',
+  'Buftea', 'Snagov', 'Chitila', 'Pantelimon', 'Popești-Leordeni',
+  'Popesti-Leordeni', 'Bragadiru', 'Chiajna', 'Jilava', 'Tunari',
+  'Cernica', 'Dobroești', 'Dobroesti', 'Glina', 'Afumați', 'Afumati',
+  'Balotești', 'Balotesti', 'Brănești', 'Branesti', 'Corbeanca',
+  'Domnești', 'Domnesti', 'Măgurele', 'Magurele', 'Ștefănești',
+  'Stefanesti', 'Clinceni', 'Cornetu', 'Berceni', 'Vidra', 'Periș',
+  'Peris', '1 Decembrie', 'Băneasa', 'Baneasa',
+];
+
 // Each entry:
 //   match.kind = 'exact' | 'pattern'   — for income_structure_fleet/login_time
 //   match.value                        — fleet name or LIKE pattern
@@ -43,9 +62,9 @@ const FLEETS = [
   },
   {
     // Everything starting with Bucharest in the source fleet column.
-    name: 'Bucharest (total)',
-    match:    { kind: 'pattern', value: 'Bucharest%' },
-    vehicles: { kind: 'city',    value: 'Bucharest%' },
+    name: 'Bucharest + Ilfov (total)',
+    match:    { kind: 'pattern',    value: 'Bucharest%' },
+    vehicles: { kind: 'city_list',  value: BUCHAREST_AREA_CITIES },
     is_total: true,
   },
 ];
@@ -92,50 +111,64 @@ export default async function handler(req, res) {
       const [hourRow] = await query(hourSql, [from, to, f.match.value]);
 
       // 3. Unique vehicles via job_analogue (proxy)
-      const vSql = f.vehicles.kind === 'services'
-        ? `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
-             FROM job_analogue
-            WHERE job_date BETWEEN $1::date AND $2::date
-              AND service = ANY($3::text[])
-              AND vehicle_reg_number IS NOT NULL
-              AND trim(vehicle_reg_number) <> ''`
-        : `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
-             FROM job_analogue
-            WHERE job_date BETWEEN $1::date AND $2::date
-              AND pick_up_city ILIKE $3
-              AND vehicle_reg_number IS NOT NULL
-              AND trim(vehicle_reg_number) <> ''`;
-      const [vRow] = await query(vSql, [from, to, f.vehicles.value]);
+      // The job_analogue table has no fleet column. Three matching modes:
+      //   services  — service = ANY($3::text[])
+      //   city_list — trim(pick_up_city) = ANY($3::text[])  (case-insensitive)
+      //   city      — pick_up_city ILIKE $3                  (legacy single pattern)
+      let vSql, vParams;
+      if (f.vehicles.kind === 'services') {
+        vSql = `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
+                  FROM job_analogue
+                 WHERE job_date BETWEEN $1::date AND $2::date
+                   AND service = ANY($3::text[])
+                   AND vehicle_reg_number IS NOT NULL
+                   AND trim(vehicle_reg_number) <> ''`;
+        vParams = [from, to, f.vehicles.value];
+      } else if (f.vehicles.kind === 'city_list') {
+        vSql = `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
+                  FROM job_analogue
+                 WHERE job_date BETWEEN $1::date AND $2::date
+                   AND lower(trim(pick_up_city)) = ANY($3::text[])
+                   AND vehicle_reg_number IS NOT NULL
+                   AND trim(vehicle_reg_number) <> ''`;
+        vParams = [from, to, f.vehicles.value.map(s => s.toLowerCase().trim())];
+      } else {
+        vSql = `SELECT COUNT(DISTINCT vehicle_reg_number)::int AS n
+                  FROM job_analogue
+                 WHERE job_date BETWEEN $1::date AND $2::date
+                   AND pick_up_city ILIKE $3
+                   AND vehicle_reg_number IS NOT NULL
+                   AND trim(vehicle_reg_number) <> ''`;
+        vParams = [from, to, f.vehicles.value];
+      }
+      const [vRow] = await query(vSql, vParams);
 
       // 4. Avg response time (minutes) split by urgency, restricted to
       // DONE jobs with a non-null response_time. Same fleet proxy as
       // unique_vehicles.
-      const rtSql = f.vehicles.kind === 'services'
-        ? `SELECT upper(urgency) AS urg,
-                  EXTRACT(EPOCH FROM AVG(response_time))/60.0       AS avg_min,
-                  EXTRACT(EPOCH FROM PERCENTILE_CONT(0.5)
-                    WITHIN GROUP (ORDER BY response_time))/60.0     AS median_min,
-                  COUNT(*)::int                                     AS n
-             FROM job_analogue
-            WHERE job_date BETWEEN $1::date AND $2::date
-              AND status = 'DONE'
-              AND response_time IS NOT NULL
-              AND upper(urgency) IN ('ASAP','PREBOOK')
-              AND service = ANY($3::text[])
-            GROUP BY upper(urgency)`
-        : `SELECT upper(urgency) AS urg,
-                  EXTRACT(EPOCH FROM AVG(response_time))/60.0       AS avg_min,
-                  EXTRACT(EPOCH FROM PERCENTILE_CONT(0.5)
-                    WITHIN GROUP (ORDER BY response_time))/60.0     AS median_min,
-                  COUNT(*)::int                                     AS n
-             FROM job_analogue
-            WHERE job_date BETWEEN $1::date AND $2::date
-              AND status = 'DONE'
-              AND response_time IS NOT NULL
-              AND upper(urgency) IN ('ASAP','PREBOOK')
-              AND pick_up_city ILIKE $3
-            GROUP BY upper(urgency)`;
-      const rtRows = await query(rtSql, [from, to, f.vehicles.value]);
+      let rtSql, rtParams;
+      const rtBase = `
+        SELECT upper(urgency) AS urg,
+               EXTRACT(EPOCH FROM AVG(response_time))/60.0       AS avg_min,
+               EXTRACT(EPOCH FROM PERCENTILE_CONT(0.5)
+                 WITHIN GROUP (ORDER BY response_time))/60.0     AS median_min,
+               COUNT(*)::int                                     AS n
+          FROM job_analogue
+         WHERE job_date BETWEEN $1::date AND $2::date
+           AND status = 'DONE'
+           AND response_time IS NOT NULL
+           AND upper(urgency) IN ('ASAP','PREBOOK')`;
+      if (f.vehicles.kind === 'services') {
+        rtSql = rtBase + ` AND service = ANY($3::text[]) GROUP BY upper(urgency)`;
+        rtParams = [from, to, f.vehicles.value];
+      } else if (f.vehicles.kind === 'city_list') {
+        rtSql = rtBase + ` AND lower(trim(pick_up_city)) = ANY($3::text[]) GROUP BY upper(urgency)`;
+        rtParams = [from, to, f.vehicles.value.map(s => s.toLowerCase().trim())];
+      } else {
+        rtSql = rtBase + ` AND pick_up_city ILIKE $3 GROUP BY upper(urgency)`;
+        rtParams = [from, to, f.vehicles.value];
+      }
+      const rtRows = await query(rtSql, rtParams);
       const byUrg = Object.fromEntries(rtRows.map(r => [r.urg, r]));
 
       const jobs  = fleetRow?.jobs    || 0;
@@ -155,8 +188,9 @@ export default async function handler(req, res) {
         },
         is_total: !!f.is_total,
         // Surface the proxy criteria so the UI tooltip can explain
-        proxy_services: f.vehicles.kind === 'services' ? f.vehicles.value : null,
-        proxy_city:     f.vehicles.kind === 'city'     ? f.vehicles.value : null,
+        proxy_services: f.vehicles.kind === 'services'  ? f.vehicles.value : null,
+        proxy_city:     f.vehicles.kind === 'city'      ? f.vehicles.value : null,
+        proxy_cities:   f.vehicles.kind === 'city_list' ? f.vehicles.value : null,
       };
     }));
 
