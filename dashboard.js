@@ -1239,6 +1239,7 @@ window.renderDashboard = function renderDashboard(){
           fleetKpiCard('Prebook on-way (min)',
                        c.response_time?.prebook?.avg_min,
                        p.response_time?.prebook?.avg_min, fmtMin, true),
+          fleetKpiCard('Cancelled rides',    c.cancelled_jobs, p.cancelled_jobs, fmtNum, true),
           fleetKpiCard('Cancellation rate',  c.cancellation_rate, p.cancellation_rate, fmtPct1, true),
         ].join('');
 
@@ -1316,9 +1317,11 @@ window.renderDashboard = function renderDashboard(){
               ${rtRow('Avg on-way time — Prebook',
                        c.response_time?.prebook, p.response_time?.prebook)}
               <tr><td>Cancellation rate
-                      <span class="muted" title="CANCELLED / total bookings (every reservation in the period, regardless of status)">(?)</span></td>
-                  <td class="num"><strong>${fmtPct1(c.cancellation_rate)}</strong></td>
-                  <td class="num muted">${fmtPct1(p.cancellation_rate)}</td>
+                      <span class="muted" title="CANCELLED / total bookings (every reservation in the period, regardless of status). Count in parens = absolute number of CANCELLED rides.">(?)</span></td>
+                  <td class="num"><strong>${fmtPct1(c.cancellation_rate)}</strong>
+                      <span class="muted" style="font-size:11px"> (${fmtNum(c.cancelled_jobs)})</span></td>
+                  <td class="num muted">${fmtPct1(p.cancellation_rate)}
+                      <span style="font-size:11px"> (${fmtNum(p.cancelled_jobs)})</span></td>
                   ${deltaCellSwapped(c.cancellation_rate, p.cancellation_rate)}</tr>
             </tbody>
           </table>
