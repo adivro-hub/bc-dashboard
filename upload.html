@@ -11,12 +11,10 @@
 <script>(function(){var t=document.documentElement.getAttribute("data-theme");if(t==="dark"){var l=document.createElement("link");l.rel="stylesheet";l.href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css";document.head.appendChild(l);}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<!-- Neon-backed backend. Supabase is no longer used at runtime.
-     config.js is kept around in case any legacy path still reads
-     window.BC_CONFIG — harmless when the file is absent (onerror=this.remove). -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js" onerror="this.remove()"></script>
 <script src="parsers.js" defer></script>
-<script src="shared_store_neon.js" defer></script>
+<script src="shared_store.js" defer></script>
 <script src="upload.js" defer></script>
 </head>
 <body><div id="authOverlay" class="overlay" style="display:none">
@@ -47,53 +45,20 @@
 
     <!-- STATE: pick periods -->
     <div class="overlay-state" data-state="pickPeriod" hidden>
-      <h1>Pick a period</h1>
+      <h1>Pick periods to compare</h1>
       <p class="overlay-sub" id="overlayCoverage"></p>
 
-      <div class="period-type-row" id="periodTypeRow" role="tablist">
-        <button type="button" class="period-type-btn active" data-type="weekly"  role="tab">Weekly</button>
-        <button type="button" class="period-type-btn"        data-type="monthly" role="tab">Monthly</button>
-        <button type="button" class="period-type-btn"        data-type="yoy"     role="tab">YoY</button>
-        <button type="button" class="period-type-btn"        data-type="custom"  role="tab">Custom</button>
-      </div>
-
-      <div class="period-panel" data-panel="weekly">
-        <label>Week
-          <select id="weekSelect"></select>
-        </label>
-      </div>
-
-      <div class="period-panel" data-panel="monthly" hidden>
-        <label>Month
-          <select id="monthSelect"></select>
-        </label>
-      </div>
-
-      <div class="period-panel" data-panel="yoy" hidden>
-        <label>Month (vs same month, previous year)
-          <select id="yoySelect"></select>
-        </label>
-      </div>
-
-      <div class="period-panel" data-panel="custom" hidden>
+      <div class="picker-modal-grid">
         <div class="picker-modal-card">
           <div class="picker-modal-label">CURRENT</div>
           <label>From <input type="date" id="overlayCurFrom" /></label>
           <label>To &nbsp;&nbsp;<input type="date" id="overlayCurTo" /></label>
         </div>
-      </div>
-
-      <p class="period-hint period-prev-line">
-        Will be compared against <span id="prevHintText">—</span>.
-        <span class="period-info-icon" tabindex="0"
-              title="The comparison period always has the same number of days as the current period, so a 28-day February isn't compared against a 31-day January. YoY uses the same calendar month one year earlier instead. You can override with 'Choose a different previous period'.">ⓘ</span>
-        <a href="#" id="prevOverrideToggle" class="prev-override-link">Choose a different previous period</a>
-      </p>
-
-      <div id="prevOverrideBlock" class="picker-modal-card prev-override-card" hidden>
-        <div class="picker-modal-label prev">PREVIOUS</div>
-        <label>From <input type="date" id="overlayPrevFrom" /></label>
-        <label>To &nbsp;&nbsp;<input type="date" id="overlayPrevTo" /></label>
+        <div class="picker-modal-card">
+          <div class="picker-modal-label prev">PREVIOUS</div>
+          <label>From <input type="date" id="overlayPrevFrom" /></label>
+          <label>To &nbsp;&nbsp;<input type="date" id="overlayPrevTo" /></label>
+        </div>
       </div>
 
       <button id="overlayGenerate" class="overlay-cta">View comparison</button>
@@ -105,12 +70,7 @@
   </div>
 </div>
 
-<!-- upload-wrap is permanently hidden in the Neon-backed flow. The
-     picker-bar inputs inside it are kept as the data-flow source of
-     truth (overlay writes into them, generate() reads from them), but
-     the entire section never renders. The "Change period" + "Refresh"
-     buttons in the dashboard header replace the visible controls. -->
-<div class="wrap" id="upload-wrap" style="display:none" hidden>
+<div class="wrap" id="upload-wrap">
   <header>
     <h1>BC Operations Dashboard</h1>
     <div class="sub" id="introText">
@@ -164,47 +124,19 @@
 
 <div class="wrap">
   <header>
-    <div class="dash-header-top">
-      <h1>Operations Dashboard</h1>
-      <div class="dash-header-actions">
-        <label class="header-toggle">
-          <input type="checkbox" id="showNamesToggle" />
-          <span>Show client names</span>
-        </label>
-        <button id="changePeriod" class="header-btn">Change period</button>
-        <button id="refreshData"  class="header-btn secondary">Refresh data</button>
-      </div>
+    <h1>Operations Dashboard — Period Comparison</h1>
+    <div class="sub" id="periodLine"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--curr)"></span>Current period</span>
+      <span><span class="dot" style="background:var(--prev)"></span>Previous period</span>
     </div>
-
-    <!-- Prominent period banner replaces the small periodLine + legend. -->
-    <div class="period-banner" id="periodBanner">
-      <div class="period-box period-box-cur">
-        <div class="period-tag">CURRENT</div>
-        <div class="period-dates" id="periodCurRange">—</div>
-        <div class="period-meta" id="periodCurDays"></div>
-      </div>
-      <div class="period-vs">vs</div>
-      <div class="period-box period-box-prev">
-        <div class="period-tag">PREVIOUS</div>
-        <div class="period-dates" id="periodPrevRange">—</div>
-        <div class="period-meta" id="periodPrevDays"></div>
-      </div>
-    </div>
-    <!-- Freshness indicator: when each dataset was last refreshed. -->
-    <div class="freshness-line" id="freshnessLine"></div>
-
-    <!-- Legacy element kept for fallback (hidden via CSS). -->
-    <div class="sub" id="periodLine" hidden></div>
   </header>
 
   <div id="dashboard-area" style="display:none">
   <div class="tabs" id="tabs">
     <button data-tab="overview" class="active">Overview</button>
-    <button data-tab="income">Income Structure</button>
-    <button data-tab="clients">Top Clients</button>
-    <button data-tab="ltv">Client LTV</button>
-    <button data-tab="hours">Hours &amp; Telemetry</button>
     <button data-tab="ops">Operational KPIs</button>
+    <button data-tab="fleets">Fleets</button>
   </div>
 
   <div class="view active" data-view="overview">
@@ -226,10 +158,6 @@
       </div>
     </div>
   </div>
-
-  </div><!-- /view-overview -->
-
-  <div class="view" data-view="income">
 
   <h2>Sales composition (current period share %)</h2>
   <div class="grid panels">
@@ -294,10 +222,6 @@
     <table id="tblHoursPerJob"></table>
   </div>
 
-  </div><!-- /view-income -->
-
-  <div class="view" data-view="hours">
-
   <h2>Hour Statistics — Fleet availability vs demand</h2>
   <div class="grid kpis" id="hourKpis"></div>
 
@@ -321,10 +245,6 @@
       <div class="chart-wrap tall"><canvas id="hourPrevChart"></canvas></div>
     </div>
   </div>
-
-  </div><!-- /view-hours -->
-
-  <div class="view" data-view="clients">
 
   <h2>Top 25 Clients</h2>
   <div class="card">
@@ -351,46 +271,6 @@
     <div class="summary-strip" id="topCorpSummary"></div>
     <table id="topCorpTable"></table>
   </div>
-
-  </div><!-- /view-clients -->
-
-  <div class="view" data-view="ltv">
-
-  <h2>Client LTV — retail (Public account)</h2>
-  <p class="sub" style="margin-top:-8px;margin-bottom:16px">
-    Earnings (total price − driver price) generated by each registered client
-    in the first 30 / 90 / 180 days after sign-up. Matched by phone (primary)
-    + email (fallback). Privacy: only hash IDs shown.
-    <br>
-    <strong>Note:</strong> showing only <code>status = 'Current'</code>
-    registrations — the 'New' status was dominated by spam batches in
-    Jan/May/Jul 2025 (≈70k signups, &lt;1% activation). Excluded by default.
-  </p>
-
-  <div class="grid kpis" id="ltvKpis"></div>
-
-  <div class="card" style="margin-top:16px">
-    <div class="row-head"><div><strong>Avg LTV by registration cohort (month)</strong>
-      <span class="pill">RON earnings per registered client</span>
-      <span class="pill">grey = incomplete window</span>
-    </div></div>
-    <div class="chart-wrap tall"><canvas id="ltvCohortChart"></canvas></div>
-    <table id="ltvCohortTable" style="margin-top:14px"></table>
-  </div>
-
-  <div class="card" style="margin-top:16px">
-    <div class="row-head">
-      <div><strong>Top 50 clients by LTV 180d</strong>
-        <span class="pill" id="ltvMatchPill">—</span>
-      </div>
-    </div>
-    <p class="sub" id="ltvTableNote" style="margin-top:0;margin-bottom:8px">—</p>
-    <table id="ltvTable"></table>
-  </div>
-
-  </div><!-- /view-ltv -->
-
-  <div class="view" data-view="ops">
 
   <h2>OTP Airport — Pickup &amp; Destination by Service</h2>
   <div class="card">
@@ -466,7 +346,10 @@
 
   <p class="sub" style="margin-top:24px">Source files: Income Structure and Job Analogue exports for the two periods shown above.</p>
 
-    <h2 style="margin-top:32px">Operational KPIs</h2>
+  </div><!-- /view-overview -->
+
+  <div class="view" data-view="ops">
+    <h2>Operational KPIs</h2>
     <p class="sub" style="margin-top:-8px;margin-bottom:18px">
       Current period vs previous period. KPI numbering matches the spec sheet.
       <strong>#3 (Active cars %)</strong> needs a registered-fleet roster we don't have yet —
@@ -486,6 +369,23 @@
       <strong>Fulfilment rate</strong> = DONE ÷ (DONE + CANCELLED).
     </p>
   </div><!-- /view-ops -->
+
+  <div class="view" data-view="fleets">
+    <h2>Bucharest fleets — BlackCab &amp; Select</h2>
+    <p class="sub" style="margin-top:-8px;margin-bottom:18px">
+      Per-fleet operational snapshot for the two main Bucharest fleets.
+      <strong>Hours, rides, sales and earnings</strong> come from the
+      operator's own per-fleet daily roll-ups (authoritative).
+      <strong>Unique vehicles</strong> is a proxy — `job_analogue` has no
+      fleet column, so it counts distinct vehicle plates by the fleet's
+      service whitelist (BlackCab Fleet ← service in {BlackCab, BlackCab 7};
+      Select Fleet ← service = Select).
+    </p>
+    <div class="grid panels" id="fleetCards"></div>
+    <p class="sub" id="fleetEmpty" style="display:none;margin-top:18px">
+      No data for either fleet in the selected period.
+    </p>
+  </div><!-- /view-fleets -->
 
   <footer class="page-footer">
     <button class="theme-toggle">🌙 Theme</button>
