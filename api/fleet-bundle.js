@@ -30,16 +30,19 @@ import { query, ok, bad, parseDateRange, requireAuth } from './_db.js';
 //   vehicles.value                     — array of services or city LIKE pattern
 const FLEETS = [
   {
-    name: 'Bucharest BlackCab Fleet',
-    match:    { kind: 'exact',   value: 'Bucharest BlackCab Fleet' },
+    // Bucharest BlackCab Fleet + Bucharest BlackCab CS Fleet rolled up.
+    name: 'Bucharest BlackCab',
+    match:    { kind: 'pattern', value: 'Bucharest BlackCab%' },
     vehicles: { kind: 'services', value: ['BlackCab', 'BlackCab 7'] },
   },
   {
-    name: 'Bucharest Select Fleet',
-    match:    { kind: 'exact',    value: 'Bucharest Select Fleet' },
+    // Bucharest Select Fleet + Bucharest Select CS Fleet rolled up.
+    name: 'Bucharest Select',
+    match:    { kind: 'pattern', value: 'Bucharest Select%' },
     vehicles: { kind: 'services', value: ['Select'] },
   },
   {
+    // Everything starting with Bucharest in the source fleet column.
     name: 'Bucharest (total)',
     match:    { kind: 'pattern', value: 'Bucharest%' },
     vehicles: { kind: 'city',    value: 'Bucharest%' },
