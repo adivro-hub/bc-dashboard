@@ -74,7 +74,7 @@ const FLEETS = [
     // or BC7 affiliate fleets — those are separate operations.
     // Both sides (income_structure match + job_analogue proxy) restricted
     // to BC/Select so the rollup is internally consistent.
-    name: 'Bucharest fleet (total)',
+    name: 'BlackCab + Select Fleet',
     match:    { kind: 'patterns', value: ['Bucharest BlackCab%', 'Bucharest Select%'] },
     vehicles: { kind: 'services', value: BUCHAREST_FLEET_SERVICES },
     is_total: true,
