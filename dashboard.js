@@ -1265,6 +1265,69 @@ window.renderDashboard = function renderDashboard(){
       const showOther = cOther > 0 || pOther > 0;
 
       const cardClass = c.is_total ? 'card fleet-total' : 'card';
+
+      // KPI tile row — shown only on the Total card. The user picked these
+      // four as the headline metrics for the rolled-up Bucharest fleet:
+      //   Online hours, Service rides (+ ASAP/Prebook breakdown), and
+      //   Cancellation rate split by urgency.
+      // Lower-is-better delta for cancellation tiles (swapped colour).
+      const kpiBlock = c.is_total ? (() => {
+        function tile(label, c_, p_, fmt, lowerIsBetter = false){
+          const cv = c_ ?? 0, pv = p_ ?? 0;
+          const diff = cv - pv;
+          const pct  = pv ? (diff / pv) * 100 : 0;
+          const flat = Math.abs(pct) < 0.05;
+          // For lowerIsBetter, an INCREASE is bad (red ▼ logic flipped)
+          const goodDir = lowerIsBetter ? diff <= 0 : diff >= 0;
+          const cls = flat ? 'flat' : (goodDir ? 'up' : 'down');
+          const arrow = flat ? '■' : (diff >= 0 ? '▲' : '▼');
+          return `<div class="card kpi">
+            <div class="label">${label}</div>
+            <div class="value num">${fmt(cv)}</div>
+            <div class="prev num">prev ${fmt(pv)}</div>
+            <span class="delta ${cls}">${arrow} ${(pct>=0?'+':'')}${pct.toFixed(1)}%</span>
+          </div>`;
+        }
+        // Service rides tile shows the parent DONE total + an inline
+        // ASAP / Prebook breakdown line so the urgency split is visible
+        // without forcing a second row of tiles.
+        const ridesTile = (() => {
+          const cv = cRides, pv = pRides;
+          const diff = cv - pv;
+          const pct = pv ? (diff / pv) * 100 : 0;
+          const flat = Math.abs(pct) < 0.05;
+          const cls = flat ? 'flat' : (diff >= 0 ? 'up' : 'down');
+          const arrow = flat ? '■' : (diff >= 0 ? '▲' : '▼');
+          return `<div class="card kpi">
+            <div class="label">Service rides</div>
+            <div class="value num">${fmtNum(cv)}</div>
+            <div class="prev num">prev ${fmtNum(pv)}</div>
+            <div class="prev num" style="margin-top:6px;line-height:1.5">
+              ASAP <strong style="color:var(--text)">${fmtNum(c.asap_done)}</strong>
+              <span class="muted">· prev ${fmtNum(p.asap_done)}</span><br>
+              Prebook <strong style="color:var(--text)">${fmtNum(c.prebook_done)}</strong>
+              <span class="muted">· prev ${fmtNum(p.prebook_done)}</span>
+            </div>
+            <span class="delta ${cls}">${arrow} ${(pct>=0?'+':'')}${pct.toFixed(1)}%</span>
+          </div>`;
+        })();
+        return `
+          <div class="grid kpis" style="margin:12px 0 4px">
+            ${tile('Online hours', c.hours, p.hours, fmtNum)}
+            ${ridesTile}
+            ${tile('Cancellation rate — ASAP',
+                    (c.cancellation_rate_asap || 0) * 100,
+                    (p.cancellation_rate_asap || 0) * 100,
+                    v => v.toFixed(1) + '%',
+                    true)}
+            ${tile('Cancellation rate — Prebook',
+                    (c.cancellation_rate_prebook || 0) * 100,
+                    (p.cancellation_rate_prebook || 0) * 100,
+                    v => v.toFixed(1) + '%',
+                    true)}
+          </div>`;
+      })() : '';
+
       host.insertAdjacentHTML('beforeend', `
         <div class="${cardClass}">
           <div class="row-head">
@@ -1275,6 +1338,7 @@ window.renderDashboard = function renderDashboard(){
             </div>
           </div>
           <div class="fleet-diag fleet-diag-${diag.cls}">${diag.text}</div>
+          ${kpiBlock}
           <table>
             <thead><tr>
               <th>Metric</th><th>Current</th><th>Previous</th><th>Δ %</th>
