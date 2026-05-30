@@ -1500,16 +1500,13 @@ window.renderDashboard = function renderDashboard(){
 
     // Slider bounds: 50% → 200% of baseline (cancel rate: 0 → baseline).
     const carsMax = Math.max(50, Math.round(baseVehicles));
-    const hpvMin = baseHpv * 0.5, hpvMax = baseHpv * 2.0;
     const rphMin = baseRph * 0.5, rphMax = baseRph * 2.0;
     const cancelMin = 0, cancelMax = baseAsapCancelRate * 100;        // %
 
     const $cars  = document.getElementById('asmExtraCars');
-    const $hpv   = document.getElementById('asmHpv');
     const $rph   = document.getElementById('asmRph');
     const $canc  = document.getElementById('asmAsapCancel');
     const $carsV = document.getElementById('asmExtraCarsVal');
-    const $hpvV  = document.getElementById('asmHpvVal');
     const $rphV  = document.getElementById('asmRphVal');
     const $cancV = document.getElementById('asmAsapCancelVal');
     const $bv    = document.getElementById('asmBaseVehicles');
@@ -1519,11 +1516,9 @@ window.renderDashboard = function renderDashboard(){
     const $reset = document.getElementById('asmReset');
 
     $cars.max   = String(carsMax);
-    $hpv.min    = hpvMin.toFixed(2);   $hpv.max = hpvMax.toFixed(2);  $hpv.step = (baseHpv * 0.01).toFixed(3);
     $rph.min    = rphMin.toFixed(3);   $rph.max = rphMax.toFixed(3);  $rph.step = (baseRph * 0.005).toFixed(4);
     $canc.min   = String(cancelMin);   $canc.max = cancelMax.toFixed(1); $canc.step = '0.1';
     $cars.value = '0';
-    $hpv.value  = baseHpv.toFixed(2);
     $rph.value  = baseRph.toFixed(3);
     $canc.value = cancelMax.toFixed(1);   // default = baseline rate (no change)
     $bv.textContent   = baseVehicles.toLocaleString('en-US');
@@ -1627,7 +1622,6 @@ window.renderDashboard = function renderDashboard(){
 
     function recompute(){
       const extraCars  = parseInt($cars.value, 10) || 0;
-      const hpv        = parseFloat($hpv.value)    || baseHpv;
       const rph        = parseFloat($rph.value)    || baseRph;
       const targetCancPct = parseFloat($canc.value); // %
       const targetCancRate = isNaN(targetCancPct) ? baseAsapCancelRate : targetCancPct / 100;
@@ -1654,19 +1648,17 @@ window.renderDashboard = function renderDashboard(){
         : ` <span class="muted" style="font-size:12px">(+${carsPct.toFixed(1)}%)</span>`;
 
       $carsV.innerHTML  = ((extraCars >= 0 ? '+' : '') + extraCars) + carsSfx;
-      $hpvV.innerHTML   = hpv.toFixed(1)  + pctSuffix(hpv, baseHpv);
       $rphV.innerHTML   = rph.toFixed(2)  + pctSuffix(rph, baseRph);
       $cancV.innerHTML  = (targetCancRate * 100).toFixed(1) + '%' + ppSuffix(targetCancRate, baseAsapCancelRate);
 
       const projVehicles = baseVehicles + extraCars;
       // Hours are split by cohort:
-      //   * Baseline cars use the hpv slider (their utilisation for the period).
+      //   * Baseline cars keep their baseline hours (no slider, just baseline).
       //   * New cars are assumed at 8 h/day for the period.
       // The 'Hours/vehicle' table row shows the BLENDED average across both.
-      const baselineCarsHours = baseVehicles * hpv;
-      const newCarsHours      = extraCars   * newCarHoursPerPeriod;
-      const projHours         = baselineCarsHours + newCarsHours;
-      const blendedHpv        = projVehicles ? projHours / projVehicles : 0;
+      const newCarsHours = extraCars * newCarHoursPerPeriod;
+      const projHours    = baseHours + newCarsHours;
+      const blendedHpv   = projVehicles ? projHours / projVehicles : 0;
       // Total ride capacity comes from the three capacity sliders.
       // Extra rides (vs baseline) get distributed by urgency as follows:
       //
@@ -1738,7 +1730,7 @@ window.renderDashboard = function renderDashboard(){
               ${row('Vehicles', projVehicles, baseVehicles, fmtNumA)}
               ${row('Online hours', projHours, baseHours, fmtNumA)}
               ${row('Hours / vehicle', blendedHpv, baseHpv, v => fmtFloatA(v, 1), {
-                      sub: `Blended across baseline cars (${hpv.toFixed(1)} h slider) and new cars (${newCarHoursPerPeriod} h fixed = ${NEW_CAR_HOURS_PER_DAY} h/day × ${periodDays} days)`
+                      sub: `Blended: baseline cars keep ${baseHpv.toFixed(1)} h, new cars at ${newCarHoursPerPeriod} h (${NEW_CAR_HOURS_PER_DAY} h/day × ${periodDays} days)`
                     })}
               ${row('Hours / ride', projHpr, baseHpr, v => fmtFloatA(v, 2), { lowerIsBetter: true })}
 
@@ -1763,10 +1755,9 @@ window.renderDashboard = function renderDashboard(){
         </div>`;
     }
 
-    [$cars, $hpv, $rph, $canc].forEach(el => el.addEventListener('input', recompute));
+    [$cars, $rph, $canc].forEach(el => el.addEventListener('input', recompute));
     $reset.addEventListener('click', () => {
       $cars.value = '0';
-      $hpv.value  = baseHpv.toFixed(2);
       $rph.value  = baseRph.toFixed(3);
       $canc.value = cancelMax.toFixed(1);
       recompute();
