@@ -517,7 +517,7 @@
     <div class="card" id="assumptionsCard" style="margin-bottom:18px">
       <div id="assumptionsLoading" class="muted">Loading baseline…</div>
       <div id="assumptionsControls" style="display:none">
-        <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:18px">
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:18px">
           <div>
             <label for="asmExtraCars" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
               <strong>Extra cars</strong>
@@ -538,6 +538,18 @@
             <div class="muted" style="font-size:11px;margin-top:4px">
               Daily availability per new car (6.0–9.0 h).
               Total per period: <span id="asmNewCarHours">—</span>.
+            </div>
+          </div>
+          <div>
+            <label for="asmNewCarEff" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+              <strong>New car effectiveness</strong>
+              <span class="num" id="asmNewCarEffVal" style="font-size:18px;color:var(--accent)">—</span>
+            </label>
+            <input type="range" id="asmNewCarEff" min="25" max="75" step="1" value="50" style="width:100%;margin-top:8px">
+            <div class="muted" style="font-size:11px;margin-top:4px">
+              Fraction of new car hours that lands as <em>net</em> fleet hours
+              — the rest is offset by baseline drivers leaving when new ones
+              join. 25 = high churn, 75 = low churn.
             </div>
           </div>
           <div>
@@ -576,11 +588,14 @@
       Elite, ChildSeat, KidsCab, iDrive Your Car, MailCab, Shuttle Bus}.
       <br><br>
       <strong>Allocation logic.</strong> Total hours =
-      <em>baseline hours + (new cars × new car h/day × period days)</em>.
+      <em>baseline hours + (new cars × h/day × period days × effectiveness)</em>.
       Baseline cars keep their actual baseline hours — no slider needed.
-      New cars work whatever the slider says (6–10 h/day, default 8).
-      Total capacity = <em>total hours × rides/hour</em>. Baseline rides
-      are preserved as-is; only the <em>extra</em> rides get split:
+      New cars work whatever the h/day slider says (6.0–9.0). The
+      effectiveness slider (25–75%) models driver churn: when new drivers
+      join, some baseline drivers leave, so only a fraction of the new
+      gross hours lands as net fleet hours. Total capacity =
+      <em>total hours × rides/hour</em>. Baseline rides are preserved
+      as-is; only the <em>extra</em> rides get split:
       <ul style="margin:6px 0 0 18px;padding:0">
         <li>Default (no cancel change): extra rides split by baseline mix —
             if 60% of current rides are ASAP, 60% of new rides go to ASAP,
