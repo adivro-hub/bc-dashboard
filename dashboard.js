@@ -1429,4 +1429,134 @@ window.renderDashboard = function renderDashboard(){
         </div>`);
     }
   })();
+
+  // ---------- ASSUMPTIONS TAB (capacity what-if simulator) ----------
+  // Pulls baseline from /api/fleet-bundle for the current period, finds
+  // the 'BlackCab + Select Fleet' (is_total) row, and exposes three sliders:
+  //   * Extra cars  (additive to current vehicle count)
+  //   * Hours / vehicle  (replaces current ratio)
+  //   * Rides / hour  (replaces current ratio = jobs / hours)
+  // Projection holds avg_price_per_ride constant from baseline. Recomputes
+  // on every input event.
+  (async function renderAssumptions(){
+    const card     = document.getElementById('assumptionsCard');
+    const loading  = document.getElementById('assumptionsLoading');
+    const controls = document.getElementById('assumptionsControls');
+    const kpisHost = document.getElementById('asmKpis');
+    const footnote = document.getElementById('asmFootnote');
+    if (!card || !loading || !controls || !kpisHost) return;
+
+    let bundle;
+    try {
+      const r = await fetch(`/api/fleet-bundle?from=${cur.period_from}&to=${cur.period_to}`,
+                            { credentials:'same-origin' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      bundle = await r.json();
+    } catch (e) {
+      loading.textContent = `Could not load baseline: ${e.message}`;
+      return;
+    }
+    // Pick the rolled-up total card as baseline.
+    const totalName = Object.keys(bundle.fleets || {}).find(
+      k => bundle.fleets[k].is_total
+    );
+    if (!totalName){
+      loading.textContent = 'No total fleet found in baseline.';
+      return;
+    }
+    const base = bundle.fleets[totalName];
+    const baseVehicles = base.unique_vehicles || 0;
+    const baseHours    = base.hours || 0;
+    const baseRides    = base.done_jobs || base.jobs || 0;
+    const baseSales    = base.sales || 0;
+    const baseEarnings = base.earnings || 0;
+    const baseHpv  = baseVehicles ? baseHours / baseVehicles : 0;
+    const baseRph  = baseHours    ? baseRides / baseHours    : 0;
+    const basePpr  = baseRides    ? baseSales / baseRides    : 0;
+    const baseEpr  = baseRides    ? baseEarnings / baseRides : 0;
+
+    if (!baseVehicles || !baseHours || !baseRides){
+      loading.textContent = 'Baseline data incomplete — need vehicles, hours and rides for the period.';
+      return;
+    }
+
+    // Slider config: 50% → 200% of baseline value, step ≈ 0.5% of baseline.
+    const carsMax = Math.max(50, Math.round(baseVehicles));      // up to +100%
+    const hpvMin = baseHpv * 0.5, hpvMax = baseHpv * 2.0;
+    const rphMin = baseRph * 0.5, rphMax = baseRph * 2.0;
+
+    const $cars  = document.getElementById('asmExtraCars');
+    const $hpv   = document.getElementById('asmHpv');
+    const $rph   = document.getElementById('asmRph');
+    const $carsV = document.getElementById('asmExtraCarsVal');
+    const $hpvV  = document.getElementById('asmHpvVal');
+    const $rphV  = document.getElementById('asmRphVal');
+    const $bv    = document.getElementById('asmBaseVehicles');
+    const $bhpv  = document.getElementById('asmBaseHpv');
+    const $brph  = document.getElementById('asmBaseRph');
+    const $reset = document.getElementById('asmReset');
+
+    $cars.max   = String(carsMax);
+    $hpv.min    = hpvMin.toFixed(2);   $hpv.max = hpvMax.toFixed(2);  $hpv.step = (baseHpv * 0.01).toFixed(3);
+    $rph.min    = rphMin.toFixed(3);   $rph.max = rphMax.toFixed(3);  $rph.step = (baseRph * 0.005).toFixed(4);
+    $cars.value = '0';
+    $hpv.value  = baseHpv.toFixed(2);
+    $rph.value  = baseRph.toFixed(3);
+    $bv.textContent   = baseVehicles.toLocaleString('en-US');
+    $bhpv.textContent = baseHpv.toFixed(1);
+    $brph.textContent = baseRph.toFixed(2);
+
+    function fmtNum2(v){ return v == null ? '—' : Number(v).toLocaleString('en-US'); }
+    function fmtMon2(v){ return v == null ? '—' : Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+    function tile(label, baseVal, projVal, fmt, unit = ''){
+      const diff = projVal - baseVal;
+      const pct  = baseVal ? (diff / baseVal) * 100 : 0;
+      const flat = Math.abs(pct) < 0.05;
+      const cls  = flat ? 'flat' : (diff >= 0 ? 'up' : 'down');
+      const arrow = flat ? '■' : (diff >= 0 ? '▲' : '▼');
+      const sign  = diff >= 0 ? '+' : '';
+      return `<div class="card kpi">
+        <div class="label">${label}</div>
+        <div class="value num">${fmt(projVal)}${unit}</div>
+        <div class="prev num">baseline ${fmt(baseVal)}${unit}</div>
+        <span class="delta ${cls}">${arrow} ${sign}${pct.toFixed(1)}% (${sign}${fmt(diff)})</span>
+      </div>`;
+    }
+
+    function recompute(){
+      const extraCars = parseInt($cars.value, 10) || 0;
+      const hpv       = parseFloat($hpv.value)    || baseHpv;
+      const rph       = parseFloat($rph.value)    || baseRph;
+      $carsV.textContent = (extraCars >= 0 ? '+' : '') + extraCars;
+      $hpvV.textContent  = hpv.toFixed(1);
+      $rphV.textContent  = rph.toFixed(2);
+
+      const projVehicles = baseVehicles + extraCars;
+      const projHours    = projVehicles * hpv;
+      const projRides    = projHours * rph;
+      const projSales    = projRides * basePpr;
+      const projEarnings = projRides * baseEpr;
+
+      kpisHost.innerHTML =
+        tile('Vehicles',        baseVehicles, projVehicles, fmtNum2) +
+        tile('Online hours',    baseHours,    projHours,    v => Math.round(v).toLocaleString('en-US')) +
+        tile('Service rides',   baseRides,    projRides,    v => Math.round(v).toLocaleString('en-US')) +
+        tile('Sales (RON)',     baseSales,    projSales,    fmtMon2) +
+        tile('Earnings (RON)',  baseEarnings, projEarnings, fmtMon2);
+    }
+
+    [$cars, $hpv, $rph].forEach(el => el.addEventListener('input', recompute));
+    $reset.addEventListener('click', () => {
+      $cars.value = '0';
+      $hpv.value  = baseHpv.toFixed(2);
+      $rph.value  = baseRph.toFixed(3);
+      recompute();
+    });
+
+    loading.style.display  = 'none';
+    controls.style.display = '';
+    footnote.style.display = '';
+    recompute();
+  })();
 };

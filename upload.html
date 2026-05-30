@@ -206,6 +206,7 @@
     <button data-tab="hours">Hours &amp; Telemetry</button>
     <button data-tab="ops">Operational KPIs</button>
     <button data-tab="fleets">Fleets</button>
+    <button data-tab="assumptions">Assumptions</button>
   </div>
 
   <div class="view active" data-view="overview">
@@ -504,6 +505,63 @@
       No data for either fleet in the selected period.
     </p>
   </div><!-- /view-fleets -->
+
+  <div class="view" data-view="assumptions">
+    <h2>Capacity simulation — BlackCab + Select</h2>
+    <p class="sub" style="margin-top:-8px;margin-bottom:18px">
+      What-if model on top of the current period. Adjust the three levers
+      (extra cars, hours per vehicle, rides per hour) to see how rides,
+      sales and earnings would change if you scaled supply or productivity.
+      All projections hold today's <strong>avg price per ride</strong> constant.
+    </p>
+    <div class="card" id="assumptionsCard" style="margin-bottom:18px">
+      <div id="assumptionsLoading" class="muted">Loading baseline…</div>
+      <div id="assumptionsControls" style="display:none">
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:18px">
+          <div>
+            <label for="asmExtraCars" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+              <strong>Extra cars</strong>
+              <span class="num" id="asmExtraCarsVal" style="font-size:18px;color:var(--accent)">+0</span>
+            </label>
+            <input type="range" id="asmExtraCars" min="0" max="100" step="1" value="0" style="width:100%;margin-top:8px">
+            <div class="muted" style="font-size:11px;margin-top:4px">
+              Baseline: <span id="asmBaseVehicles">—</span> vehicles
+            </div>
+          </div>
+          <div>
+            <label for="asmHpv" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+              <strong>Hours / vehicle</strong>
+              <span class="num" id="asmHpvVal" style="font-size:18px;color:var(--accent)">—</span>
+            </label>
+            <input type="range" id="asmHpv" min="0" max="100" step="0.1" value="50" style="width:100%;margin-top:8px">
+            <div class="muted" style="font-size:11px;margin-top:4px">
+              Baseline: <span id="asmBaseHpv">—</span> hours / vehicle in this period
+            </div>
+          </div>
+          <div>
+            <label for="asmRph" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+              <strong>Rides / hour</strong>
+              <span class="num" id="asmRphVal" style="font-size:18px;color:var(--accent)">—</span>
+            </label>
+            <input type="range" id="asmRph" min="0" max="100" step="0.01" value="50" style="width:100%;margin-top:8px">
+            <div class="muted" style="font-size:11px;margin-top:4px">
+              Baseline: <span id="asmBaseRph">—</span> rides / online hour
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
+          <button id="asmReset" class="theme-toggle" style="padding:6px 12px;font-size:12px">Reset to baseline</button>
+          <span class="muted" style="font-size:12px">Sliders span 50–200% of baseline values.</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid kpis" id="asmKpis"></div>
+    <p class="sub" id="asmFootnote" style="margin-top:14px;display:none">
+      Vehicle count uses the same proxy as the Fleets tab — distinct plates
+      from <code>job_analogue</code> with service ∈ {BlackCab, BlackCab 7, Select,
+      Elite, ChildSeat, KidsCab, iDrive Your Car, MailCab, Shuttle Bus}.
+    </p>
+  </div><!-- /view-assumptions -->
 
   <footer class="page-footer">
     <button class="theme-toggle">🌙 Theme</button>
