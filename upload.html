@@ -542,14 +542,15 @@
           </div>
           <div>
             <label for="asmNewCarEff" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
-              <strong>New car effectiveness</strong>
+              <strong>Fleet overlap indicator</strong>
               <span class="num" id="asmNewCarEffVal" style="font-size:18px;color:var(--accent)">—</span>
             </label>
             <input type="range" id="asmNewCarEff" min="25" max="75" step="1" value="50" style="width:100%;margin-top:8px">
             <div class="muted" style="font-size:11px;margin-top:4px">
-              Fraction of new car hours that lands as <em>net</em> fleet hours
-              — the rest is offset by baseline drivers leaving when new ones
-              join. 25 = high churn, 75 = low churn.
+              Fraction of added cars that genuinely grow the fleet — the
+              rest overlaps with baseline drivers leaving when newcomers
+              join. 25 = high overlap / mostly replacement, 75 = low
+              overlap / mostly genuine net growth.
             </div>
           </div>
           <div>
@@ -587,17 +588,16 @@
       from <code>job_analogue</code> with service ∈ {BlackCab, BlackCab 7, Select,
       Elite, ChildSeat, KidsCab, iDrive Your Car, MailCab, Shuttle Bus}.
       <br><br>
-      <strong>Allocation logic.</strong> Every added car carries the
-      effectiveness factor. Two equivalent framings:
-      <em>each added car contributes (h/day × days × effectiveness) net
-      hours</em>, or <em>of N added cars, only N × effectiveness are net
-      effective after baseline driver churn</em> (the rest is offset by
-      baseline drivers leaving when newcomers join). The Vehicles row
-      shows the post-churn net fleet size; the hours/vehicle blended
-      across baseline (their actual h) and net effective new cars (full
-      h/day × days each). Total capacity = <em>total hours × rides/hour</em>.
-      Baseline rides are preserved as-is; only the <em>extra</em> rides
-      get split:
+      <strong>Allocation logic.</strong> Every added car is discounted by
+      the <em>fleet overlap indicator</em>. Two equivalent framings:
+      <em>each added car contributes (h/day × days × overlap) net hours</em>,
+      or <em>of N added cars, only N × overlap are net effective</em> (the
+      rest is offset by baseline drivers leaving when newcomers join).
+      The Vehicles row shows the post-overlap net fleet size; the
+      hours/vehicle blended across baseline (their actual h) and net
+      effective new cars (full h/day × days each). Total capacity =
+      <em>total hours × rides/hour</em>. Baseline rides are preserved
+      as-is; only the <em>extra</em> rides get split:
       <ul style="margin:6px 0 0 18px;padding:0">
         <li>Default (no cancel change): extra rides split by baseline mix —
             if 60% of current rides are ASAP, 60% of new rides go to ASAP,
@@ -612,11 +612,11 @@
       Without extra capacity (all 3 capacity sliders at baseline), lowering
       the cancel rate has no effect — the rescue needs room to happen.
       <br><br>
-      The <strong>Max gain (no churn)</strong> column shows what the gain
-      over baseline would be if new car effectiveness were 100% — i.e.
-      the theoretical ceiling if zero baseline drivers leave when newcomers
+      The <strong>Max gain (no overlap)</strong> column shows what the gain
+      over baseline would be at 100% fleet overlap indicator — i.e. the
+      theoretical ceiling if zero baseline drivers leave when newcomers
       join. Compare it to <em>Δ abs</em> (the realistic gain): the
-      difference between them is the cost of churn for this scenario.
+      difference between them is the cost of overlap for this scenario.
       <br><br>
       <strong>On-way times</strong> and <strong>Prebook cancellation rate</strong>
       are held constant — the current levers don't model them.

@@ -1626,7 +1626,7 @@ window.renderDashboard = function renderDashboard(){
         const maxStr  = Math.abs(maxDiff) < 0.005
           ? '—'
           : `${maxSign}${fmt(Math.abs(maxDiff))}`;
-        maxCell = `<td class="num muted" title="Gain at 100% effectiveness (no driver churn). Max absolute value: ${fmt(maxVal)}">${maxStr}</td>`;
+        maxCell = `<td class="num muted" title="Gain at 100% fleet overlap indicator (no driver churn). Max absolute value: ${fmt(maxVal)}">${maxStr}</td>`;
       }
       const sub = opts.sub ? `<span class="muted" title="${opts.sub}">(?)</span>` : '';
       const indent = opts.indent ? 'style="padding-left:24px"' : '';
@@ -1681,7 +1681,7 @@ window.renderDashboard = function renderDashboard(){
       $rphV.innerHTML   = rph.toFixed(2)  + pctSuffix(rph, baseRph);
       $cancV.innerHTML  = (targetCancRate * 100).toFixed(1) + '%' + ppSuffix(targetCancRate, baseAsapCancelRate);
       if ($newCarHours) $newCarHours.textContent =
-        `${newCarHpd.toFixed(1)}×${periodDays} = ${newCarHoursPerPeriod.toFixed(0)} h each (gross, before effectiveness)`;
+        `${newCarHpd.toFixed(1)}×${periodDays} = ${newCarHoursPerPeriod.toFixed(0)} h each (gross, before overlap indicator)`;
 
       // Effectiveness applies to ALL added cars uniformly: each added car
       // contributes (h/day × days × eff) net hours. We compute the whole
@@ -1766,7 +1766,7 @@ window.renderDashboard = function renderDashboard(){
             <thead><tr>
               <th>Metric</th>
               <th>Projected</th>
-              <th title="Gain over baseline if new car effectiveness were 100% (no driver churn) — the theoretical ceiling">Max gain (no churn)</th>
+              <th title="Gain over baseline if fleet overlap indicator were 100% (no driver churn) — the theoretical ceiling">Max gain (no overlap)</th>
               <th>Baseline</th>
               <th>Δ %</th>
               <th>Δ abs</th>
@@ -1774,7 +1774,7 @@ window.renderDashboard = function renderDashboard(){
             <tbody>
               ${groupHead('Capacity')}
               ${row('Vehicles', projVehicles, max.projVehicles, baseVehicles, fmtNumA, {
-                      sub: `Net effective = baseline + (extra × effectiveness). Projected: ${extraCars} × ${(newCarEff*100).toFixed(0)}% = ${netExtraCars.toFixed(1)}. Max (no churn): all ${extraCars} land net`
+                      sub: `Net effective = baseline + (extra × overlap indicator). Projected: ${extraCars} × ${(newCarEff*100).toFixed(0)}% = ${netExtraCars.toFixed(1)}. Max (no overlap): all ${extraCars} land net`
                     })}
               ${row('Online hours', projHours, max.projHours, baseHours, fmtNumA)}
               ${row('Hours / vehicle', blendedHpv, max.blendedHpv, baseHpv, v => fmtFloatA(v, 1), {
