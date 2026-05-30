@@ -1659,24 +1659,25 @@ window.renderDashboard = function renderDashboard(){
       // hpd slider: show the value + the resulting total hours per car.
       $carsV.innerHTML  = ((extraCars >= 0 ? '+' : '') + extraCars) + carsSfx;
       $hpdV.innerHTML   = `${newCarHpd.toFixed(1)} h <span class="muted" style="font-size:12px">(${newCarHoursPerPeriod.toFixed(0)} h / car)</span>`;
-      // Effective hours per new car after churn discount.
-      const effHrsPerCar = newCarHoursPerPeriod * newCarEff;
-      $effV.innerHTML   = `${(newCarEff * 100).toFixed(0)}% <span class="muted" style="font-size:12px">(${effHrsPerCar.toFixed(0)} h net / car)</span>`;
+      // Effectiveness readout: shows the % + net effective cars.
+      const netCarsRounded = (extraCars * newCarEff).toFixed(1).replace(/\.0$/, '');
+      $effV.innerHTML   = `${(newCarEff * 100).toFixed(0)}% <span class="muted" style="font-size:12px">(${netCarsRounded} net of ${extraCars} added)</span>`;
       $rphV.innerHTML   = rph.toFixed(2)  + pctSuffix(rph, baseRph);
       $cancV.innerHTML  = (targetCancRate * 100).toFixed(1) + '%' + ppSuffix(targetCancRate, baseAsapCancelRate);
       if ($newCarHours) $newCarHours.textContent =
         `${newCarHpd.toFixed(1)}×${periodDays} = ${newCarHoursPerPeriod.toFixed(0)} h each (gross, before effectiveness)`;
 
-      const projVehicles = baseVehicles + extraCars;
-      // Hours are split by cohort:
-      //   * Baseline cars keep their baseline hours (no slider).
-      //   * New cars: extra_cars × hpd × days × effectiveness
-      //     The effectiveness multiplier models driver churn — when new
-      //     drivers join, some baseline drivers leave, so only a fraction
-      //     of new gross hours lands as net fleet hours.
-      // The 'Hours/vehicle' table row shows the BLENDED average across both.
+      // Effectiveness applies to ALL added cars uniformly. Two equivalent
+      // ways to read it:
+      //   * Each added car contributes (h/day × days × effectiveness) net hours
+      //   * Or: of N added cars, only (N × effectiveness) are 'net effective'
+      //     after baseline driver churn, each at full h/day × days hours
+      // Math is identical; the display below uses the second framing so
+      // the Vehicle row reflects the net post-churn fleet size.
+      const netExtraCars  = extraCars * newCarEff;
+      const projVehicles  = baseVehicles + netExtraCars;
       const grossNewHours = extraCars * newCarHoursPerPeriod;
-      const newCarsHours  = grossNewHours * newCarEff;
+      const newCarsHours  = grossNewHours * newCarEff; // same as netExtraCars × hpd × days
       const projHours     = baseHours + newCarsHours;
       const blendedHpv    = projVehicles ? projHours / projVehicles : 0;
       // Total ride capacity comes from the three capacity sliders.
@@ -1748,10 +1749,12 @@ window.renderDashboard = function renderDashboard(){
             </tr></thead>
             <tbody>
               ${groupHead('Capacity')}
-              ${row('Vehicles', projVehicles, baseVehicles, fmtNumA)}
+              ${row('Vehicles', projVehicles, baseVehicles, fmtNumA, {
+                      sub: `Net effective fleet size = baseline + (extra × effectiveness). ${extraCars} added × ${(newCarEff*100).toFixed(0)}% = ${netExtraCars.toFixed(1)} net new cars after churn`
+                    })}
               ${row('Online hours', projHours, baseHours, fmtNumA)}
               ${row('Hours / vehicle', blendedHpv, baseHpv, v => fmtFloatA(v, 1), {
-                      sub: `Blended: baseline cars keep ${baseHpv.toFixed(1)} h; new cars contribute ${(newCarHoursPerPeriod * newCarEff).toFixed(0)} h net each (${newCarHpd.toFixed(1)} h/day × ${periodDays} days × ${(newCarEff*100).toFixed(0)}% effectiveness)`
+                      sub: `Blended across baseline cars (keep ${baseHpv.toFixed(1)} h) and net effective new cars (full ${newCarHoursPerPeriod.toFixed(0)} h each)`
                     })}
               ${row('Rides / hour', projRph, baseRph, v => fmtFloatA(v, 2))}
 
