@@ -1592,8 +1592,9 @@ window.renderDashboard = function renderDashboard(){
         </div>
       </div>`;
     }
-    // Table row — projected vs baseline, Δ %, Δ absolute.
-    function row(label, projVal, baseVal, fmt, opts = {}){
+    // Table row — projected (realistic) vs no-churn ceiling vs baseline,
+    // with Δ %, Δ absolute (deltas always compare realistic vs baseline).
+    function row(label, projVal, maxVal, baseVal, fmt, opts = {}){
       const lowerIsBetter = !!opts.lowerIsBetter;
       const heldConstant  = !!opts.held;
       const diff = (projVal || 0) - (baseVal || 0);
@@ -1613,17 +1614,23 @@ window.renderDashboard = function renderDashboard(){
         pctHtml = `<td class="num ${cls}">${arrow} ${sign}${pct.toFixed(1)}%</td>`;
         absHtml = `<td class="num ${cls}">${sign}${fmt(Math.abs(diff))}</td>`;
       }
+      // No-churn-ceiling column. For held rows or non-projection metrics,
+      // pass null/undefined to mute the cell.
+      const maxCell = (maxVal == null)
+        ? `<td class="num muted">—</td>`
+        : `<td class="num muted" title="If effectiveness were 100% (no driver churn)">${fmt(maxVal)}</td>`;
       const sub = opts.sub ? `<span class="muted" title="${opts.sub}">(?)</span>` : '';
       const indent = opts.indent ? 'style="padding-left:24px"' : '';
       const muted = opts.indent ? 'class="muted"' : '';
       return `<tr><td ${indent} ${muted}>${label} ${sub}</td>
         <td class="num"><strong>${fmt(projVal)}</strong></td>
+        ${maxCell}
         <td class="num muted">${fmt(baseVal)}</td>
         ${pctHtml}
         ${absHtml}</tr>`;
     }
     function groupHead(label){
-      return `<tr class="group-head"><td colspan="5">${label}</td></tr>`;
+      return `<tr class="group-head"><td colspan="6">${label}</td></tr>`;
     }
 
     function recompute(){
@@ -1667,55 +1674,57 @@ window.renderDashboard = function renderDashboard(){
       if ($newCarHours) $newCarHours.textContent =
         `${newCarHpd.toFixed(1)}×${periodDays} = ${newCarHoursPerPeriod.toFixed(0)} h each (gross, before effectiveness)`;
 
-      // Effectiveness applies to ALL added cars uniformly. Two equivalent
-      // ways to read it:
-      //   * Each added car contributes (h/day × days × effectiveness) net hours
-      //   * Or: of N added cars, only (N × effectiveness) are 'net effective'
-      //     after baseline driver churn, each at full h/day × days hours
-      // Math is identical; the display below uses the second framing so
-      // the Vehicle row reflects the net post-churn fleet size.
-      const netExtraCars  = extraCars * newCarEff;
-      const projVehicles  = baseVehicles + netExtraCars;
-      const grossNewHours = extraCars * newCarHoursPerPeriod;
-      const newCarsHours  = grossNewHours * newCarEff; // same as netExtraCars × hpd × days
-      const projHours     = baseHours + newCarsHours;
-      const blendedHpv    = projVehicles ? projHours / projVehicles : 0;
-      // Total ride capacity comes from the three capacity sliders.
-      // Extra rides (vs baseline) get distributed by urgency as follows:
-      //
-      //   1. Default: split by baseline mix. If 60% of current rides are
-      //      ASAP and capacity adds 100 rides, 60 go to ASAP, 40 to non-ASAP.
-      //   2. Lower target ASAP cancel rate shifts the mix toward ASAP:
-      //      'rescued' bookings = baseline_ASAP_total × (base_rate − target).
-      //      That rescued count is added to ASAP's share of extra rides
-      //      and subtracted from non-ASAP's share (Prebook + Other).
-      //   3. Rescue is capped at the non-ASAP portion of extra capacity —
-      //      we never claw rides back from baseline Prebook/Other.
-      //
-      // Baseline numbers are always preserved; only the extra rides shift.
-      const projCapacity = projHours * rph;
-      const extraTotal   = projCapacity - baseRides;
+      // Effectiveness applies to ALL added cars uniformly: each added car
+      // contributes (h/day × days × eff) net hours. We compute the whole
+      // projection twice — once with the live slider, once at 100% — so
+      // the table can show a 'no-churn ceiling' column alongside the
+      // realistic projection.
       const baselineAsapShare = baseRides ? baseAsap / baseRides : 0;
-      const baseNonAsap  = basePrebook + baseOther;
+      const baseNonAsap       = basePrebook + baseOther;
+      const rescuedRaw        = baseAsapTotal * Math.max(0, baseAsapCancelRate - targetCancRate);
 
-      const rescuedRaw  = baseAsapTotal * Math.max(0, baseAsapCancelRate - targetCancRate);
-      const maxRescue   = Math.max(0, extraTotal * (1 - baselineAsapShare));
-      const effectiveRescue = Math.min(rescuedRaw, maxRescue);
+      function projectAt(eff){
+        const netExtra      = extraCars * eff;
+        const projVehicles  = baseVehicles + netExtra;
+        const newCarsHours  = extraCars * newCarHoursPerPeriod * eff;
+        const projHours     = baseHours + newCarsHours;
+        const blendedHpv    = projVehicles ? projHours / projVehicles : 0;
+        const projCapacity  = projHours * rph;
+        const extraTotal    = projCapacity - baseRides;
+        // Allocation: extras default to baseline mix; cancel slider shifts
+        // toward ASAP (rescued bookings cap at non-ASAP extra share).
+        const maxRescue        = Math.max(0, extraTotal * (1 - baselineAsapShare));
+        const effectiveRescue  = Math.min(rescuedRaw, maxRescue);
+        const extraAsap        = extraTotal * baselineAsapShare + effectiveRescue;
+        const extraNonAsap     = extraTotal - extraAsap;
+        const extraPrebook     = baseNonAsap > 0 ? extraNonAsap * (basePrebook / baseNonAsap) : 0;
+        const extraOther       = baseNonAsap > 0 ? extraNonAsap * (baseOther   / baseNonAsap) : 0;
+        const projAsap         = baseAsap    + extraAsap;
+        const projPrebook      = basePrebook + extraPrebook;
+        const projOther        = baseOther   + extraOther;
+        const projRides        = projAsap + projPrebook + projOther;
+        const projSales        = projRides * basePpr;
+        const projEarnings     = projRides * baseEpr;
+        const projRph          = projHours > 0 ? projRides / projHours : null;
+        return { netExtra, projVehicles, projHours, blendedHpv, projAsap,
+                 projPrebook, projOther, projRides, projSales, projEarnings, projRph };
+      }
 
-      const extraAsap    = extraTotal * baselineAsapShare + effectiveRescue;
-      const extraNonAsap = extraTotal - extraAsap;
-      const extraPrebook = baseNonAsap > 0 ? extraNonAsap * (basePrebook / baseNonAsap) : 0;
-      const extraOther   = baseNonAsap > 0 ? extraNonAsap * (baseOther   / baseNonAsap) : 0;
+      const live = projectAt(newCarEff);   // realistic — current slider
+      const max  = projectAt(1.0);         // ceiling — no churn
 
-      const projAsap     = baseAsap    + extraAsap;
-      const projPrebook  = basePrebook + extraPrebook;
-      const projOther    = baseOther   + extraOther;
-      const projRides    = projAsap + projPrebook + projOther;
-      const projSales    = projRides * basePpr;
-      const projEarnings = projRides * baseEpr;
-      // Rides / hour (higher = better). Same source on numerator + denominator.
-      const projRph      = projHours > 0 ? projRides / projHours : null;
-      // baseRph already computed at the top of renderAssumptions().
+      // Aliases so the rest of the function reads naturally.
+      const netExtraCars = live.netExtra;
+      const projVehicles = live.projVehicles;
+      const projHours    = live.projHours;
+      const blendedHpv   = live.blendedHpv;
+      const projAsap     = live.projAsap;
+      const projPrebook  = live.projPrebook;
+      const projOther    = live.projOther;
+      const projRides    = live.projRides;
+      const projSales    = live.projSales;
+      const projEarnings = live.projEarnings;
+      const projRph      = live.projRph;
       // Response times are still held (no slider models them).
       const baseRtAsap   = base.response_time?.asap?.avg_min    ?? null;
       const baseRtPre    = base.response_time?.prebook?.avg_min ?? null;
@@ -1733,8 +1742,9 @@ window.renderDashboard = function renderDashboard(){
 
       // ---- Full breakdown table ----
       const otherRow = (baseOther > 0 || projOther > 0.5)
-        ? row('— Other', projOther, baseOther, fmtNumA, { indent: true })
+        ? row('— Other', projOther, max.projOther, baseOther, fmtNumA, { indent: true })
         : '';
+      // Other-row helper for the max column too (for the conditional render).
       tableHost.innerHTML = `
         <div class="card">
           <div class="row-head">
@@ -1745,35 +1755,40 @@ window.renderDashboard = function renderDashboard(){
           </div>
           <table>
             <thead><tr>
-              <th>Metric</th><th>Projected</th><th>Baseline</th><th>Δ %</th><th>Δ abs</th>
+              <th>Metric</th>
+              <th>Projected</th>
+              <th title="Same scenario but with new car effectiveness at 100% — the theoretical ceiling if no baseline drivers leave when newcomers join">Max (no churn)</th>
+              <th>Baseline</th>
+              <th>Δ %</th>
+              <th>Δ abs</th>
             </tr></thead>
             <tbody>
               ${groupHead('Capacity')}
-              ${row('Vehicles', projVehicles, baseVehicles, fmtNumA, {
-                      sub: `Net effective fleet size = baseline + (extra × effectiveness). ${extraCars} added × ${(newCarEff*100).toFixed(0)}% = ${netExtraCars.toFixed(1)} net new cars after churn`
+              ${row('Vehicles', projVehicles, max.projVehicles, baseVehicles, fmtNumA, {
+                      sub: `Net effective = baseline + (extra × effectiveness). Projected: ${extraCars} × ${(newCarEff*100).toFixed(0)}% = ${netExtraCars.toFixed(1)}. Max (no churn): all ${extraCars} land net`
                     })}
-              ${row('Online hours', projHours, baseHours, fmtNumA)}
-              ${row('Hours / vehicle', blendedHpv, baseHpv, v => fmtFloatA(v, 1), {
+              ${row('Online hours', projHours, max.projHours, baseHours, fmtNumA)}
+              ${row('Hours / vehicle', blendedHpv, max.blendedHpv, baseHpv, v => fmtFloatA(v, 1), {
                       sub: `Blended across baseline cars (keep ${baseHpv.toFixed(1)} h) and net effective new cars (full ${newCarHoursPerPeriod.toFixed(0)} h each)`
                     })}
-              ${row('Rides / hour', projRph, baseRph, v => fmtFloatA(v, 2))}
+              ${row('Rides / hour', projRph, max.projRph, baseRph, v => fmtFloatA(v, 2))}
 
               ${groupHead('Volume & Revenue')}
-              ${row('Service rides', projRides, baseRides, fmtNumA)}
-              ${row('— ASAP done', projAsap, baseAsap, fmtNumA, { indent: true,
+              ${row('Service rides', projRides, max.projRides, baseRides, fmtNumA)}
+              ${row('— ASAP done', projAsap, max.projAsap, baseAsap, fmtNumA, { indent: true,
                       sub: 'baseline ASAP + (extra rides × baseline ASAP share) + rescued cancellations' })}
-              ${row('— Prebook done', projPrebook, basePrebook, fmtNumA, { indent: true,
+              ${row('— Prebook done', projPrebook, max.projPrebook, basePrebook, fmtNumA, { indent: true,
                       sub: 'baseline Prebook + (extra non-ASAP rides × baseline Prebook share)' })}
               ${otherRow}
-              ${row('Sales (RON)', projSales, baseSales, fmtMonA)}
-              ${row('Earnings (RON)', projEarnings, baseEarnings, fmtMonA)}
-              ${row('Avg price / ride (RON)', basePpr, basePpr, fmtMonA, { held: true })}
+              ${row('Sales (RON)', projSales, max.projSales, baseSales, fmtMonA)}
+              ${row('Earnings (RON)', projEarnings, max.projEarnings, baseEarnings, fmtMonA)}
+              ${row('Avg price / ride (RON)', basePpr, basePpr, basePpr, fmtMonA, { held: true })}
 
               ${groupHead('Service quality')}
-              ${row('Avg on-way time — ASAP', baseRtAsap, baseRtAsap, fmtMinA, { held: true, lowerIsBetter: true })}
-              ${row('Avg on-way time — Prebook', baseRtPre, baseRtPre, fmtMinA, { held: true, lowerIsBetter: true })}
-              ${row('Cancellation rate — ASAP', targetCancRate, baseAsapCancelRate, fmtPctA, { lowerIsBetter: true })}
-              ${row('Cancellation rate — Prebook', basePrebookCancelRate, basePrebookCancelRate, fmtPctA, { held: true, lowerIsBetter: true })}
+              ${row('Avg on-way time — ASAP', baseRtAsap, baseRtAsap, baseRtAsap, fmtMinA, { held: true, lowerIsBetter: true })}
+              ${row('Avg on-way time — Prebook', baseRtPre, baseRtPre, baseRtPre, fmtMinA, { held: true, lowerIsBetter: true })}
+              ${row('Cancellation rate — ASAP', targetCancRate, targetCancRate, baseAsapCancelRate, fmtPctA, { lowerIsBetter: true })}
+              ${row('Cancellation rate — Prebook', basePrebookCancelRate, basePrebookCancelRate, basePrebookCancelRate, fmtPctA, { held: true, lowerIsBetter: true })}
             </tbody>
           </table>
         </div>`;
