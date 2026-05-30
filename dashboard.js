@@ -1290,14 +1290,17 @@ window.renderDashboard = function renderDashboard(){
         // Compact inline delta pill used inside split tiles.
         // lowerIsBetter flips the colour but the arrow still follows
         // the actual direction of change (▲ for up, ▼ for down).
-        function inlineDelta(cv, pv, lowerIsBetter = false){
+        // Shows % + absolute change when fmt is supplied.
+        function inlineDelta(cv, pv, fmt, lowerIsBetter = false){
           const diff = (cv || 0) - (pv || 0);
           const pct  = pv ? (diff / pv) * 100 : 0;
           const flat = Math.abs(pct) < 0.05;
           const goodDir = lowerIsBetter ? diff <= 0 : diff >= 0;
           const cls  = flat ? 'flat' : (goodDir ? 'up' : 'down');
           const arrow = flat ? '■' : (diff >= 0 ? '▲' : '▼');
-          return `<span class="delta ${cls}" style="margin-top:0;padding:1px 6px;font-size:11px">${arrow} ${(pct>=0?'+':'')}${pct.toFixed(1)}%</span>`;
+          const sign  = diff >= 0 ? '+' : '';
+          const absStr = fmt ? ` (${sign}${fmt(Math.abs(diff))})` : '';
+          return `<span class="delta ${cls}" style="margin-top:0;padding:1px 6px;font-size:11px">${arrow} ${sign}${pct.toFixed(1)}%${absStr}</span>`;
         }
         // Two-in-one tile: shows ASAP and Prebook side-by-side with
         // independent deltas. They move differently (ASAP tracks supply,
@@ -1311,13 +1314,13 @@ window.renderDashboard = function renderDashboard(){
                 <span><span class="muted" style="font-size:12px">ASAP</span>
                   <strong class="num" style="font-size:18px">${fmt(cAsap ?? 0)}</strong>
                   <span class="muted" style="font-size:11px">· prev ${fmt(pAsap ?? 0)}</span></span>
-                ${inlineDelta(cAsap, pAsap, lowerIsBetter)}
+                ${inlineDelta(cAsap, pAsap, fmt, lowerIsBetter)}
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px">
                 <span><span class="muted" style="font-size:12px">Prebook</span>
                   <strong class="num" style="font-size:18px">${fmt(cPre ?? 0)}</strong>
                   <span class="muted" style="font-size:11px">· prev ${fmt(pPre ?? 0)}</span></span>
-                ${inlineDelta(cPre, pPre, lowerIsBetter)}
+                ${inlineDelta(cPre, pPre, fmt, lowerIsBetter)}
               </div>
             </div>
           </div>`;
@@ -1540,15 +1543,17 @@ window.renderDashboard = function renderDashboard(){
         <span class="delta ${cls}">${arrow} ${sign}${pct.toFixed(1)}% (${sign}${fmt(diff)})</span>
       </div>`;
     }
-    // Inline delta pill for split tiles.
-    function inlineDelta(cv, pv, lowerIsBetter = false){
+    // Inline delta pill for split tiles. Shows % + absolute change.
+    function inlineDelta(cv, pv, fmt, lowerIsBetter = false){
       const diff = (cv || 0) - (pv || 0);
       const pct  = pv ? (diff / pv) * 100 : 0;
       const flat = Math.abs(pct) < 0.05;
       const goodDir = lowerIsBetter ? diff <= 0 : diff >= 0;
       const cls  = flat ? 'flat' : (goodDir ? 'up' : 'down');
       const arrow = flat ? '■' : (diff >= 0 ? '▲' : '▼');
-      return `<span class="delta ${cls}" style="margin-top:0;padding:1px 6px;font-size:11px">${arrow} ${(pct>=0?'+':'')}${pct.toFixed(1)}%</span>`;
+      const sign  = diff >= 0 ? '+' : '';
+      const absStr = fmt ? ` (${sign}${fmt(Math.abs(diff))})` : '';
+      return `<span class="delta ${cls}" style="margin-top:0;padding:1px 6px;font-size:11px">${arrow} ${sign}${pct.toFixed(1)}%${absStr}</span>`;
     }
     function splitTile(label, cAsap, pAsap, cPre, pPre, fmt, lowerIsBetter = false){
       return `<div class="card kpi">
@@ -1558,33 +1563,37 @@ window.renderDashboard = function renderDashboard(){
             <span><span class="muted" style="font-size:12px">ASAP</span>
               <strong class="num" style="font-size:18px">${fmt(cAsap ?? 0)}</strong>
               <span class="muted" style="font-size:11px">· base ${fmt(pAsap ?? 0)}</span></span>
-            ${inlineDelta(cAsap, pAsap, lowerIsBetter)}
+            ${inlineDelta(cAsap, pAsap, fmt, lowerIsBetter)}
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px">
             <span><span class="muted" style="font-size:12px">Prebook</span>
               <strong class="num" style="font-size:18px">${fmt(cPre ?? 0)}</strong>
               <span class="muted" style="font-size:11px">· base ${fmt(pPre ?? 0)}</span></span>
-            ${inlineDelta(cPre, pPre, lowerIsBetter)}
+            ${inlineDelta(cPre, pPre, fmt, lowerIsBetter)}
           </div>
         </div>
       </div>`;
     }
-    // Table row — projected vs baseline + delta cell.
+    // Table row — projected vs baseline, Δ %, Δ absolute.
     function row(label, projVal, baseVal, fmt, opts = {}){
       const lowerIsBetter = !!opts.lowerIsBetter;
       const heldConstant  = !!opts.held;
       const diff = (projVal || 0) - (baseVal || 0);
       const pct  = baseVal ? (diff / baseVal) * 100 : 0;
-      let deltaHtml;
+      let pctHtml, absHtml;
       if (heldConstant){
-        deltaHtml = `<td class="num muted" title="Held constant — current levers don't model this">held</td>`;
+        pctHtml = `<td class="num muted" title="Held constant — current levers don't model this">held</td>`;
+        absHtml = `<td class="num muted">—</td>`;
       } else if (projVal == null && baseVal == null){
-        deltaHtml = '<td class="num muted">—</td>';
+        pctHtml = '<td class="num muted">—</td>';
+        absHtml = '<td class="num muted">—</td>';
       } else {
         const goodDir = lowerIsBetter ? diff <= 0 : diff >= 0;
         const cls = Math.abs(diff) < 0.005 ? 'muted' : (goodDir ? 'pos' : 'neg');
         const arrow = diff >= 0 ? '▲' : '▼';
-        deltaHtml = `<td class="num ${cls}">${arrow} ${(diff>=0?'+':'')}${pct.toFixed(1)}%</td>`;
+        const sign  = diff >= 0 ? '+' : '';
+        pctHtml = `<td class="num ${cls}">${arrow} ${sign}${pct.toFixed(1)}%</td>`;
+        absHtml = `<td class="num ${cls}">${sign}${fmt(Math.abs(diff))}</td>`;
       }
       const sub = opts.sub ? `<span class="muted" title="${opts.sub}">(?)</span>` : '';
       const indent = opts.indent ? 'style="padding-left:24px"' : '';
@@ -1592,10 +1601,11 @@ window.renderDashboard = function renderDashboard(){
       return `<tr><td ${indent} ${muted}>${label} ${sub}</td>
         <td class="num"><strong>${fmt(projVal)}</strong></td>
         <td class="num muted">${fmt(baseVal)}</td>
-        ${deltaHtml}</tr>`;
+        ${pctHtml}
+        ${absHtml}</tr>`;
     }
     function groupHead(label){
-      return `<tr class="group-head"><td colspan="4">${label}</td></tr>`;
+      return `<tr class="group-head"><td colspan="5">${label}</td></tr>`;
     }
 
     function recompute(){
@@ -1645,7 +1655,7 @@ window.renderDashboard = function renderDashboard(){
           </div>
           <table>
             <thead><tr>
-              <th>Metric</th><th>Projected</th><th>Baseline</th><th>Δ %</th>
+              <th>Metric</th><th>Projected</th><th>Baseline</th><th>Δ %</th><th>Δ abs</th>
             </tr></thead>
             <tbody>
               ${groupHead('Capacity')}
