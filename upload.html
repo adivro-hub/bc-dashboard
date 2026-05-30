@@ -572,13 +572,17 @@
       Vehicle count uses the same proxy as the Fleets tab — distinct plates
       from <code>job_analogue</code> with service ∈ {BlackCab, BlackCab 7, Select,
       Elite, ChildSeat, KidsCab, iDrive Your Car, MailCab, Shuttle Bus}.
-      <strong>ASAP done</strong> is recomputed from
-      <em>baseline ASAP bookings × (1 − target cancel rate)</em>, so it
-      overrides the linear capacity scaling (the assumption being that
-      added supply rescues no-supply cancellations rather than creating
-      new demand). <strong>Prebook done</strong> and <strong>Other done</strong>
-      scale linearly with capacity. <strong>On-way times</strong> and
-      <strong>Prebook cancellation rate</strong> are held constant.
+      <br><br>
+      <strong>Allocation logic.</strong> Total capacity =
+      <em>(baseline cars + extra) × hours/vehicle × rides/hour</em>.
+      ASAP gets first dibs: <em>ASAP done = min(baseline_ASAP_bookings ×
+      (1 − target_cancel_rate), capacity)</em>. Whatever capacity is left
+      splits between Prebook and Other in their baseline proportions. So
+      when you add cars AND drop the ASAP cancel rate together, the extra
+      rides preferentially go to ASAP rescue, not Prebook.
+      <br><br>
+      <strong>On-way times</strong> and <strong>Prebook cancellation rate</strong>
+      are held constant — the current levers don't model them.
     </p>
   </div><!-- /view-assumptions -->
 

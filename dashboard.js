@@ -1630,15 +1630,26 @@ window.renderDashboard = function renderDashboard(){
 
       const projVehicles = baseVehicles + extraCars;
       const projHours    = projVehicles * hpv;
-      // ASAP done is now decoupled from linear capacity scaling —
-      // it's driven by demand (baseline ASAP bookings) and the target
-      // cancellation rate. Lowering the rate rescues bookings that
-      // would otherwise have been no-supply cancellations.
-      const projAsap     = baseAsapTotal * (1 - targetCancRate);
-      // Prebook / Other still scale linearly with capacity.
-      const linearProjRides = projHours * rph;
-      const projPrebook  = linearProjRides * sharePrebook;
-      const projOther    = linearProjRides * shareOther;
+      // Total ride capacity for the period is bounded by the three
+      // capacity sliders (cars × hpv × rph). Allocation between
+      // urgencies is then driven by the cancellation lever:
+      //
+      //   1. ASAP demand = baseline_ASAP_bookings × (1 − target_rate)
+      //      — the rides we'd serve if the cancel rate dropped to target.
+      //   2. ASAP gets first dibs on capacity (rescuing cancellations is
+      //      higher-priority than picking up another Prebook).
+      //   3. Whatever's left splits between Prebook and Other in their
+      //      baseline proportions.
+      //
+      // So when extra cars come in AND ASAP cancel rate drops, the extra
+      // capacity preferentially flows to ASAP rescue, not Prebook.
+      const projCapacity = projHours * rph;
+      const asapDemand   = baseAsapTotal * (1 - targetCancRate);
+      const projAsap     = Math.min(asapDemand, projCapacity);
+      const remaining    = Math.max(0, projCapacity - projAsap);
+      const baseNonAsap  = basePrebook + baseOther;
+      const projPrebook  = baseNonAsap > 0 ? remaining * (basePrebook / baseNonAsap) : remaining;
+      const projOther    = baseNonAsap > 0 ? remaining * (baseOther   / baseNonAsap) : 0;
       const projRides    = projAsap + projPrebook + projOther;
       const projSales    = projRides * basePpr;
       const projEarnings = projRides * baseEpr;
@@ -1685,8 +1696,9 @@ window.renderDashboard = function renderDashboard(){
               ${groupHead('Volume & Revenue')}
               ${row('Service rides', projRides, baseRides, fmtNumA)}
               ${row('— ASAP done', projAsap, baseAsap, fmtNumA, { indent: true,
-                      sub: 'baseline ASAP bookings × (1 − target cancel rate)' })}
-              ${row('— Prebook done', projPrebook, basePrebook, fmtNumA, { indent: true })}
+                      sub: 'min(baseline ASAP bookings × (1 − target cancel rate), total capacity)' })}
+              ${row('— Prebook done', projPrebook, basePrebook, fmtNumA, { indent: true,
+                      sub: 'baseline Prebook share of capacity remaining after ASAP rescue' })}
               ${otherRow}
               ${row('Sales (RON)', projSales, baseSales, fmtMonA)}
               ${row('Earnings (RON)', projEarnings, baseEarnings, fmtMonA)}
