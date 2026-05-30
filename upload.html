@@ -517,7 +517,7 @@
     <div class="card" id="assumptionsCard" style="margin-bottom:18px">
       <div id="assumptionsLoading" class="muted">Loading baseline…</div>
       <div id="assumptionsControls" style="display:none">
-        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:18px">
+        <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:18px">
           <div>
             <label for="asmExtraCars" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
               <strong>Extra cars</strong>
@@ -526,9 +526,18 @@
             <input type="range" id="asmExtraCars" min="0" max="100" step="1" value="0" style="width:100%;margin-top:8px">
             <div class="muted" style="font-size:11px;margin-top:4px">
               Baseline: <span id="asmBaseVehicles">—</span> vehicles.
-              New cars assumed at <strong>8 h/day</strong>
-              (<span id="asmNewCarHours">—</span> for the period).
               Baseline cars keep their <span id="asmBaseHpv">—</span> h/vehicle.
+            </div>
+          </div>
+          <div>
+            <label for="asmNewCarHpd" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+              <strong>New car hours / day</strong>
+              <span class="num" id="asmNewCarHpdVal" style="font-size:18px;color:var(--accent)">—</span>
+            </label>
+            <input type="range" id="asmNewCarHpd" min="6" max="9" step="0.1" value="8" style="width:100%;margin-top:8px">
+            <div class="muted" style="font-size:11px;margin-top:4px">
+              Daily availability per new car (6.0–9.0 h).
+              Total per period: <span id="asmNewCarHours">—</span>.
             </div>
           </div>
           <div>
@@ -555,7 +564,7 @@
         </div>
         <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
           <button id="asmReset" class="theme-toggle" style="padding:6px 12px;font-size:12px">Reset to baseline</button>
-          <span class="muted" style="font-size:12px">Sliders span 50–200% of baseline (cancel rate: 0 → baseline).</span>
+          <span class="muted" style="font-size:12px">Capacity sliders span 50–200% of baseline (cancel rate: 0 → baseline).</span>
         </div>
       </div>
     </div>
@@ -567,10 +576,11 @@
       Elite, ChildSeat, KidsCab, iDrive Your Car, MailCab, Shuttle Bus}.
       <br><br>
       <strong>Allocation logic.</strong> Total hours =
-      <em>baseline hours + (new cars × 8 h/day × period days)</em>. Baseline
-      cars keep their actual baseline hours — no slider needed. Total
-      capacity = <em>total hours × rides/hour</em>. Baseline rides are
-      preserved as-is; only the <em>extra</em> rides get split:
+      <em>baseline hours + (new cars × new car h/day × period days)</em>.
+      Baseline cars keep their actual baseline hours — no slider needed.
+      New cars work whatever the slider says (6–10 h/day, default 8).
+      Total capacity = <em>total hours × rides/hour</em>. Baseline rides
+      are preserved as-is; only the <em>extra</em> rides get split:
       <ul style="margin:6px 0 0 18px;padding:0">
         <li>Default (no cancel change): extra rides split by baseline mix —
             if 60% of current rides are ASAP, 60% of new rides go to ASAP,

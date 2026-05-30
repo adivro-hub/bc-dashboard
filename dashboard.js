@@ -1469,11 +1469,9 @@ window.renderDashboard = function renderDashboard(){
       return;
     }
     const base = bundle.fleets[totalName];
-    // New cars are assumed to work 8 hours per day for the whole period.
-    // (Configurable later if needed — for now this is the user's spec.)
-    const NEW_CAR_HOURS_PER_DAY = 8;
+    // New cars work N hours per day — N is now a slider (6–10, default 8).
+    const NEW_CAR_HPD_DEFAULT = 8;
     const periodDays = curDays;
-    const newCarHoursPerPeriod = NEW_CAR_HOURS_PER_DAY * periodDays;
     const baseVehicles = base.unique_vehicles || 0;
     const baseHours    = base.hours || 0;
     const baseRides    = base.done_jobs || base.jobs || 0;
@@ -1503,31 +1501,34 @@ window.renderDashboard = function renderDashboard(){
     const rphMin = baseRph * 0.5, rphMax = baseRph * 2.0;
     const cancelMin = 0, cancelMax = baseAsapCancelRate * 100;        // %
 
-    const $cars  = document.getElementById('asmExtraCars');
-    const $rph   = document.getElementById('asmRph');
-    const $canc  = document.getElementById('asmAsapCancel');
-    const $carsV = document.getElementById('asmExtraCarsVal');
-    const $rphV  = document.getElementById('asmRphVal');
-    const $cancV = document.getElementById('asmAsapCancelVal');
-    const $bv    = document.getElementById('asmBaseVehicles');
-    const $bhpv  = document.getElementById('asmBaseHpv');
-    const $brph  = document.getElementById('asmBaseRph');
-    const $bcanc = document.getElementById('asmBaseAsapCancel');
-    const $reset = document.getElementById('asmReset');
+    const $cars   = document.getElementById('asmExtraCars');
+    const $hpd    = document.getElementById('asmNewCarHpd');
+    const $rph    = document.getElementById('asmRph');
+    const $canc   = document.getElementById('asmAsapCancel');
+    const $carsV  = document.getElementById('asmExtraCarsVal');
+    const $hpdV   = document.getElementById('asmNewCarHpdVal');
+    const $rphV   = document.getElementById('asmRphVal');
+    const $cancV  = document.getElementById('asmAsapCancelVal');
+    const $bv     = document.getElementById('asmBaseVehicles');
+    const $bhpv   = document.getElementById('asmBaseHpv');
+    const $brph   = document.getElementById('asmBaseRph');
+    const $bcanc  = document.getElementById('asmBaseAsapCancel');
+    const $newCarHours = document.getElementById('asmNewCarHours');
+    const $reset  = document.getElementById('asmReset');
 
     $cars.max   = String(carsMax);
     $rph.min    = rphMin.toFixed(3);   $rph.max = rphMax.toFixed(3);  $rph.step = (baseRph * 0.005).toFixed(4);
     $canc.min   = String(cancelMin);   $canc.max = cancelMax.toFixed(1); $canc.step = '0.1';
+    // $hpd bounds are set in the HTML (6–10, step 0.1, default 8) — no need
+    // to derive them from baseline.
     $cars.value = '0';
+    $hpd.value  = String(NEW_CAR_HPD_DEFAULT);
     $rph.value  = baseRph.toFixed(3);
     $canc.value = cancelMax.toFixed(1);   // default = baseline rate (no change)
     $bv.textContent   = baseVehicles.toLocaleString('en-US');
     $bhpv.textContent = baseHpv.toFixed(1);
     $brph.textContent = baseRph.toFixed(2);
     $bcanc.textContent = (baseAsapCancelRate * 100).toFixed(1) + '%';
-    const $newCarHours = document.getElementById('asmNewCarHours');
-    if ($newCarHours) $newCarHours.textContent =
-      `${NEW_CAR_HOURS_PER_DAY}×${periodDays} = ${newCarHoursPerPeriod} h each`;
 
     // Formatters — match the Fleets tab style.
     const fmtNumA = v => v == null ? '—' : Math.round(Number(v)).toLocaleString('en-US');
@@ -1622,9 +1623,11 @@ window.renderDashboard = function renderDashboard(){
 
     function recompute(){
       const extraCars  = parseInt($cars.value, 10) || 0;
+      const newCarHpd  = parseFloat($hpd.value)    || NEW_CAR_HPD_DEFAULT;
       const rph        = parseFloat($rph.value)    || baseRph;
       const targetCancPct = parseFloat($canc.value); // %
       const targetCancRate = isNaN(targetCancPct) ? baseAsapCancelRate : targetCancPct / 100;
+      const newCarHoursPerPeriod = newCarHpd * periodDays;
 
       // Helper: format the % delta vs baseline for the slider readout.
       // Returns a small grey suffix so it doesn't fight the main value.
@@ -1647,9 +1650,13 @@ window.renderDashboard = function renderDashboard(){
       const carsSfx = extraCars === 0 ? ''
         : ` <span class="muted" style="font-size:12px">(+${carsPct.toFixed(1)}%)</span>`;
 
+      // hpd slider: show the value + the resulting total hours per car.
       $carsV.innerHTML  = ((extraCars >= 0 ? '+' : '') + extraCars) + carsSfx;
+      $hpdV.innerHTML   = `${newCarHpd.toFixed(1)} h <span class="muted" style="font-size:12px">(${newCarHoursPerPeriod.toFixed(0)} h / car)</span>`;
       $rphV.innerHTML   = rph.toFixed(2)  + pctSuffix(rph, baseRph);
       $cancV.innerHTML  = (targetCancRate * 100).toFixed(1) + '%' + ppSuffix(targetCancRate, baseAsapCancelRate);
+      if ($newCarHours) $newCarHours.textContent =
+        `${newCarHpd.toFixed(1)}×${periodDays} = ${newCarHoursPerPeriod.toFixed(0)} h each`;
 
       const projVehicles = baseVehicles + extraCars;
       // Hours are split by cohort:
@@ -1730,7 +1737,7 @@ window.renderDashboard = function renderDashboard(){
               ${row('Vehicles', projVehicles, baseVehicles, fmtNumA)}
               ${row('Online hours', projHours, baseHours, fmtNumA)}
               ${row('Hours / vehicle', blendedHpv, baseHpv, v => fmtFloatA(v, 1), {
-                      sub: `Blended: baseline cars keep ${baseHpv.toFixed(1)} h, new cars at ${newCarHoursPerPeriod} h (${NEW_CAR_HOURS_PER_DAY} h/day × ${periodDays} days)`
+                      sub: `Blended: baseline cars keep ${baseHpv.toFixed(1)} h, new cars at ${newCarHoursPerPeriod.toFixed(0)} h (${newCarHpd.toFixed(1)} h/day × ${periodDays} days)`
                     })}
               ${row('Hours / ride', projHpr, baseHpr, v => fmtFloatA(v, 2), { lowerIsBetter: true })}
 
@@ -1755,9 +1762,10 @@ window.renderDashboard = function renderDashboard(){
         </div>`;
     }
 
-    [$cars, $rph, $canc].forEach(el => el.addEventListener('input', recompute));
+    [$cars, $hpd, $rph, $canc].forEach(el => el.addEventListener('input', recompute));
     $reset.addEventListener('click', () => {
       $cars.value = '0';
+      $hpd.value  = String(NEW_CAR_HPD_DEFAULT);
       $rph.value  = baseRph.toFixed(3);
       $canc.value = cancelMax.toFixed(1);
       recompute();
