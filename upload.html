@@ -574,12 +574,21 @@
       Elite, ChildSeat, KidsCab, iDrive Your Car, MailCab, Shuttle Bus}.
       <br><br>
       <strong>Allocation logic.</strong> Total capacity =
-      <em>(baseline cars + extra) × hours/vehicle × rides/hour</em>.
-      ASAP gets first dibs: <em>ASAP done = min(baseline_ASAP_bookings ×
-      (1 − target_cancel_rate), capacity)</em>. Whatever capacity is left
-      splits between Prebook and Other in their baseline proportions. So
-      when you add cars AND drop the ASAP cancel rate together, the extra
-      rides preferentially go to ASAP rescue, not Prebook.
+      <em>(baseline cars + extra) × hours/vehicle × rides/hour</em>. Baseline
+      rides are preserved as-is; only the <em>extra</em> rides get split:
+      <ul style="margin:6px 0 0 18px;padding:0">
+        <li>Default (no cancel change): extra rides split by baseline mix —
+            if 60% of current rides are ASAP, 60% of new rides go to ASAP,
+            40% to Prebook.</li>
+        <li>Lower target ASAP cancel rate: shifts the mix toward ASAP.
+            Rescued cancellations = <em>baseline_ASAP_total × (base_rate −
+            target_rate)</em>. So e.g. 100 extra rides with a small cancel
+            reduction might split 65 ASAP / 35 Prebook instead of 60/40.</li>
+        <li>Rescue is capped at the non-ASAP portion of extra capacity —
+            we never claw rides back from baseline Prebook to feed ASAP.</li>
+      </ul>
+      Without extra capacity (all 3 capacity sliders at baseline), lowering
+      the cancel rate has no effect — the rescue needs room to happen.
       <br><br>
       <strong>On-way times</strong> and <strong>Prebook cancellation rate</strong>
       are held constant — the current levers don't model them.

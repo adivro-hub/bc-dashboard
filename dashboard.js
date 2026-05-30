@@ -1652,26 +1652,36 @@ window.renderDashboard = function renderDashboard(){
 
       const projVehicles = baseVehicles + extraCars;
       const projHours    = projVehicles * hpv;
-      // Total ride capacity for the period is bounded by the three
-      // capacity sliders (cars × hpv × rph). Allocation between
-      // urgencies is then driven by the cancellation lever:
+      // Total ride capacity comes from the three capacity sliders.
+      // Extra rides (vs baseline) get distributed by urgency as follows:
       //
-      //   1. ASAP demand = baseline_ASAP_bookings × (1 − target_rate)
-      //      — the rides we'd serve if the cancel rate dropped to target.
-      //   2. ASAP gets first dibs on capacity (rescuing cancellations is
-      //      higher-priority than picking up another Prebook).
-      //   3. Whatever's left splits between Prebook and Other in their
-      //      baseline proportions.
+      //   1. Default: split by baseline mix. If 60% of current rides are
+      //      ASAP and capacity adds 100 rides, 60 go to ASAP, 40 to non-ASAP.
+      //   2. Lower target ASAP cancel rate shifts the mix toward ASAP:
+      //      'rescued' bookings = baseline_ASAP_total × (base_rate − target).
+      //      That rescued count is added to ASAP's share of extra rides
+      //      and subtracted from non-ASAP's share (Prebook + Other).
+      //   3. Rescue is capped at the non-ASAP portion of extra capacity —
+      //      we never claw rides back from baseline Prebook/Other.
       //
-      // So when extra cars come in AND ASAP cancel rate drops, the extra
-      // capacity preferentially flows to ASAP rescue, not Prebook.
+      // Baseline numbers are always preserved; only the extra rides shift.
       const projCapacity = projHours * rph;
-      const asapDemand   = baseAsapTotal * (1 - targetCancRate);
-      const projAsap     = Math.min(asapDemand, projCapacity);
-      const remaining    = Math.max(0, projCapacity - projAsap);
+      const extraTotal   = projCapacity - baseRides;
+      const baselineAsapShare = baseRides ? baseAsap / baseRides : 0;
       const baseNonAsap  = basePrebook + baseOther;
-      const projPrebook  = baseNonAsap > 0 ? remaining * (basePrebook / baseNonAsap) : remaining;
-      const projOther    = baseNonAsap > 0 ? remaining * (baseOther   / baseNonAsap) : 0;
+
+      const rescuedRaw  = baseAsapTotal * Math.max(0, baseAsapCancelRate - targetCancRate);
+      const maxRescue   = Math.max(0, extraTotal * (1 - baselineAsapShare));
+      const effectiveRescue = Math.min(rescuedRaw, maxRescue);
+
+      const extraAsap    = extraTotal * baselineAsapShare + effectiveRescue;
+      const extraNonAsap = extraTotal - extraAsap;
+      const extraPrebook = baseNonAsap > 0 ? extraNonAsap * (basePrebook / baseNonAsap) : 0;
+      const extraOther   = baseNonAsap > 0 ? extraNonAsap * (baseOther   / baseNonAsap) : 0;
+
+      const projAsap     = baseAsap    + extraAsap;
+      const projPrebook  = basePrebook + extraPrebook;
+      const projOther    = baseOther   + extraOther;
       const projRides    = projAsap + projPrebook + projOther;
       const projSales    = projRides * basePpr;
       const projEarnings = projRides * baseEpr;
@@ -1718,9 +1728,9 @@ window.renderDashboard = function renderDashboard(){
               ${groupHead('Volume & Revenue')}
               ${row('Service rides', projRides, baseRides, fmtNumA)}
               ${row('— ASAP done', projAsap, baseAsap, fmtNumA, { indent: true,
-                      sub: 'min(baseline ASAP bookings × (1 − target cancel rate), total capacity)' })}
+                      sub: 'baseline ASAP + (extra rides × baseline ASAP share) + rescued cancellations' })}
               ${row('— Prebook done', projPrebook, basePrebook, fmtNumA, { indent: true,
-                      sub: 'baseline Prebook share of capacity remaining after ASAP rescue' })}
+                      sub: 'baseline Prebook + (extra non-ASAP rides × baseline Prebook share)' })}
               ${otherRow}
               ${row('Sales (RON)', projSales, baseSales, fmtMonA)}
               ${row('Earnings (RON)', projEarnings, baseEarnings, fmtMonA)}
