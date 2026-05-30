@@ -1614,11 +1614,20 @@ window.renderDashboard = function renderDashboard(){
         pctHtml = `<td class="num ${cls}">${arrow} ${sign}${pct.toFixed(1)}%</td>`;
         absHtml = `<td class="num ${cls}">${sign}${fmt(Math.abs(diff))}</td>`;
       }
-      // No-churn-ceiling column. For held rows or non-projection metrics,
-      // pass null/undefined to mute the cell.
-      const maxCell = (maxVal == null)
-        ? `<td class="num muted">—</td>`
-        : `<td class="num muted" title="If effectiveness were 100% (no driver churn)">${fmt(maxVal)}</td>`;
+      // No-churn-ceiling column shows the GAIN over baseline (maxVal − baseVal)
+      // so it's directly comparable to Δ abs. For held rows or rows where
+      // baseVal is null, mute the cell.
+      let maxCell;
+      if (maxVal == null || baseVal == null || heldConstant){
+        maxCell = `<td class="num muted">—</td>`;
+      } else {
+        const maxDiff = (maxVal || 0) - (baseVal || 0);
+        const maxSign = maxDiff >= 0 ? '+' : '−';
+        const maxStr  = Math.abs(maxDiff) < 0.005
+          ? '—'
+          : `${maxSign}${fmt(Math.abs(maxDiff))}`;
+        maxCell = `<td class="num muted" title="Gain at 100% effectiveness (no driver churn). Max absolute value: ${fmt(maxVal)}">${maxStr}</td>`;
+      }
       const sub = opts.sub ? `<span class="muted" title="${opts.sub}">(?)</span>` : '';
       const indent = opts.indent ? 'style="padding-left:24px"' : '';
       const muted = opts.indent ? 'class="muted"' : '';
@@ -1757,7 +1766,7 @@ window.renderDashboard = function renderDashboard(){
             <thead><tr>
               <th>Metric</th>
               <th>Projected</th>
-              <th title="Same scenario but with new car effectiveness at 100% — the theoretical ceiling if no baseline drivers leave when newcomers join">Max (no churn)</th>
+              <th title="Gain over baseline if new car effectiveness were 100% (no driver churn) — the theoretical ceiling">Max gain (no churn)</th>
               <th>Baseline</th>
               <th>Δ %</th>
               <th>Δ abs</th>
