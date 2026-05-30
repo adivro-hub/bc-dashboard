@@ -517,7 +517,7 @@
     <div class="card" id="assumptionsCard" style="margin-bottom:18px">
       <div id="assumptionsLoading" class="muted">Loading baseline…</div>
       <div id="assumptionsControls" style="display:none">
-        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:18px">
+        <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:18px">
           <div>
             <label for="asmExtraCars" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
               <strong>Extra cars</strong>
@@ -548,10 +548,21 @@
               Baseline: <span id="asmBaseRph">—</span> rides / online hour
             </div>
           </div>
+          <div>
+            <label for="asmAsapCancel" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+              <strong>Target ASAP cancellation rate</strong>
+              <span class="num" id="asmAsapCancelVal" style="font-size:18px;color:var(--accent)">—</span>
+            </label>
+            <input type="range" id="asmAsapCancel" min="0" max="100" step="0.1" value="50" style="width:100%;margin-top:8px">
+            <div class="muted" style="font-size:11px;margin-top:4px">
+              Baseline: <span id="asmBaseAsapCancel">—</span>. Lowering converts ASAP cancellations into DONE rides
+              (assumes ASAP demand stays at baseline).
+            </div>
+          </div>
         </div>
         <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
           <button id="asmReset" class="theme-toggle" style="padding:6px 12px;font-size:12px">Reset to baseline</button>
-          <span class="muted" style="font-size:12px">Sliders span 50–200% of baseline values.</span>
+          <span class="muted" style="font-size:12px">Sliders span 50–200% of baseline values (cancel rate: 0 → baseline).</span>
         </div>
       </div>
     </div>
@@ -561,9 +572,13 @@
       Vehicle count uses the same proxy as the Fleets tab — distinct plates
       from <code>job_analogue</code> with service ∈ {BlackCab, BlackCab 7, Select,
       Elite, ChildSeat, KidsCab, iDrive Your Car, MailCab, Shuttle Bus}.
-      <strong>On-way times</strong> and <strong>cancellation rates</strong> are
-      held constant — the current levers don't model response time or
-      cancellation response to supply changes.
+      <strong>ASAP done</strong> is recomputed from
+      <em>baseline ASAP bookings × (1 − target cancel rate)</em>, so it
+      overrides the linear capacity scaling (the assumption being that
+      added supply rescues no-supply cancellations rather than creating
+      new demand). <strong>Prebook done</strong> and <strong>Other done</strong>
+      scale linearly with capacity. <strong>On-way times</strong> and
+      <strong>Prebook cancellation rate</strong> are held constant.
     </p>
   </div><!-- /view-assumptions -->
 

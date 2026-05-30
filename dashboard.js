@@ -1477,12 +1477,14 @@ window.renderDashboard = function renderDashboard(){
     const baseOther    = Math.max(0, baseRides - baseAsap - basePrebook);
     const baseSales    = base.sales || 0;
     const baseEarnings = base.earnings || 0;
+    const baseAsapTotal       = base.asap_total || 0;
+    const baseAsapCancelRate  = base.cancellation_rate_asap || 0;     // 0–1
+    const basePrebookCancelRate = base.cancellation_rate_prebook || 0;
     const baseHpv  = baseVehicles ? baseHours / baseVehicles : 0;
     const baseRph  = baseHours    ? baseRides / baseHours    : 0;
     const basePpr  = baseRides    ? baseSales / baseRides    : 0;
     const baseEpr  = baseRides    ? baseEarnings / baseRides : 0;
-    // Mix shares — used to split projected rides into ASAP / Prebook / Other.
-    const shareAsap    = baseRides ? baseAsap    / baseRides : 0;
+    // Mix shares for Prebook / Other linear projection.
     const sharePrebook = baseRides ? basePrebook / baseRides : 0;
     const shareOther   = baseRides ? baseOther   / baseRides : 0;
 
@@ -1491,31 +1493,38 @@ window.renderDashboard = function renderDashboard(){
       return;
     }
 
-    // Slider bounds: 50% → 200% of baseline.
+    // Slider bounds: 50% → 200% of baseline (cancel rate: 0 → baseline).
     const carsMax = Math.max(50, Math.round(baseVehicles));
     const hpvMin = baseHpv * 0.5, hpvMax = baseHpv * 2.0;
     const rphMin = baseRph * 0.5, rphMax = baseRph * 2.0;
+    const cancelMin = 0, cancelMax = baseAsapCancelRate * 100;        // %
 
     const $cars  = document.getElementById('asmExtraCars');
     const $hpv   = document.getElementById('asmHpv');
     const $rph   = document.getElementById('asmRph');
+    const $canc  = document.getElementById('asmAsapCancel');
     const $carsV = document.getElementById('asmExtraCarsVal');
     const $hpvV  = document.getElementById('asmHpvVal');
     const $rphV  = document.getElementById('asmRphVal');
+    const $cancV = document.getElementById('asmAsapCancelVal');
     const $bv    = document.getElementById('asmBaseVehicles');
     const $bhpv  = document.getElementById('asmBaseHpv');
     const $brph  = document.getElementById('asmBaseRph');
+    const $bcanc = document.getElementById('asmBaseAsapCancel');
     const $reset = document.getElementById('asmReset');
 
     $cars.max   = String(carsMax);
     $hpv.min    = hpvMin.toFixed(2);   $hpv.max = hpvMax.toFixed(2);  $hpv.step = (baseHpv * 0.01).toFixed(3);
     $rph.min    = rphMin.toFixed(3);   $rph.max = rphMax.toFixed(3);  $rph.step = (baseRph * 0.005).toFixed(4);
+    $canc.min   = String(cancelMin);   $canc.max = cancelMax.toFixed(1); $canc.step = '0.1';
     $cars.value = '0';
     $hpv.value  = baseHpv.toFixed(2);
     $rph.value  = baseRph.toFixed(3);
+    $canc.value = cancelMax.toFixed(1);   // default = baseline rate (no change)
     $bv.textContent   = baseVehicles.toLocaleString('en-US');
     $bhpv.textContent = baseHpv.toFixed(1);
     $brph.textContent = baseRph.toFixed(2);
+    $bcanc.textContent = (baseAsapCancelRate * 100).toFixed(1) + '%';
 
     // Formatters — match the Fleets tab style.
     const fmtNumA = v => v == null ? '—' : Math.round(Number(v)).toLocaleString('en-US');
@@ -1609,36 +1618,45 @@ window.renderDashboard = function renderDashboard(){
     }
 
     function recompute(){
-      const extraCars = parseInt($cars.value, 10) || 0;
-      const hpv       = parseFloat($hpv.value)    || baseHpv;
-      const rph       = parseFloat($rph.value)    || baseRph;
-      $carsV.textContent = (extraCars >= 0 ? '+' : '') + extraCars;
-      $hpvV.textContent  = hpv.toFixed(1);
-      $rphV.textContent  = rph.toFixed(2);
+      const extraCars  = parseInt($cars.value, 10) || 0;
+      const hpv        = parseFloat($hpv.value)    || baseHpv;
+      const rph        = parseFloat($rph.value)    || baseRph;
+      const targetCancPct = parseFloat($canc.value); // %
+      const targetCancRate = isNaN(targetCancPct) ? baseAsapCancelRate : targetCancPct / 100;
+      $carsV.textContent  = (extraCars >= 0 ? '+' : '') + extraCars;
+      $hpvV.textContent   = hpv.toFixed(1);
+      $rphV.textContent   = rph.toFixed(2);
+      $cancV.textContent  = (targetCancRate * 100).toFixed(1) + '%';
 
       const projVehicles = baseVehicles + extraCars;
       const projHours    = projVehicles * hpv;
-      const projRides    = projHours * rph;
-      const projAsap     = projRides * shareAsap;
-      const projPrebook  = projRides * sharePrebook;
-      const projOther    = projRides * shareOther;
+      // ASAP done is now decoupled from linear capacity scaling —
+      // it's driven by demand (baseline ASAP bookings) and the target
+      // cancellation rate. Lowering the rate rescues bookings that
+      // would otherwise have been no-supply cancellations.
+      const projAsap     = baseAsapTotal * (1 - targetCancRate);
+      // Prebook / Other still scale linearly with capacity.
+      const linearProjRides = projHours * rph;
+      const projPrebook  = linearProjRides * sharePrebook;
+      const projOther    = linearProjRides * shareOther;
+      const projRides    = projAsap + projPrebook + projOther;
       const projSales    = projRides * basePpr;
       const projEarnings = projRides * baseEpr;
       const projHpr      = projRides ? projHours / projRides : null;
       const baseHpr      = baseRides ? baseHours / baseRides : null;
-      // Held-constant fields (response times, cancellation rates)
+      // Response times are still held (no slider models them).
       const baseRtAsap   = base.response_time?.asap?.avg_min    ?? null;
       const baseRtPre    = base.response_time?.prebook?.avg_min ?? null;
-      const baseCancAsap = base.cancellation_rate_asap          ?? 0;
-      const baseCancPre  = base.cancellation_rate_prebook       ?? 0;
 
-      // ---- KPI tiles row (mirrors Fleet Total card) ----
+      // ---- KPI tiles row ----
       kpisHost.innerHTML =
         tile('Online hours', baseHours, projHours, fmtNumA) +
         splitTile('Service rides',
                   projAsap, baseAsap, projPrebook, basePrebook, fmtNumA) +
         splitTile('Cancellation rate',
-                  baseCancAsap, baseCancAsap, baseCancPre, baseCancPre, fmtPctA, true) +
+                  targetCancRate, baseAsapCancelRate,
+                  basePrebookCancelRate, basePrebookCancelRate,
+                  fmtPctA, true) +
         tile('Sales (RON)', baseSales, projSales, fmtMonA);
 
       // ---- Full breakdown table ----
@@ -1666,7 +1684,8 @@ window.renderDashboard = function renderDashboard(){
 
               ${groupHead('Volume & Revenue')}
               ${row('Service rides', projRides, baseRides, fmtNumA)}
-              ${row('— ASAP done', projAsap, baseAsap, fmtNumA, { indent: true })}
+              ${row('— ASAP done', projAsap, baseAsap, fmtNumA, { indent: true,
+                      sub: 'baseline ASAP bookings × (1 − target cancel rate)' })}
               ${row('— Prebook done', projPrebook, basePrebook, fmtNumA, { indent: true })}
               ${otherRow}
               ${row('Sales (RON)', projSales, baseSales, fmtMonA)}
@@ -1676,18 +1695,19 @@ window.renderDashboard = function renderDashboard(){
               ${groupHead('Service quality')}
               ${row('Avg on-way time — ASAP', baseRtAsap, baseRtAsap, fmtMinA, { held: true, lowerIsBetter: true })}
               ${row('Avg on-way time — Prebook', baseRtPre, baseRtPre, fmtMinA, { held: true, lowerIsBetter: true })}
-              ${row('Cancellation rate — ASAP', baseCancAsap, baseCancAsap, fmtPctA, { held: true, lowerIsBetter: true })}
-              ${row('Cancellation rate — Prebook', baseCancPre, baseCancPre, fmtPctA, { held: true, lowerIsBetter: true })}
+              ${row('Cancellation rate — ASAP', targetCancRate, baseAsapCancelRate, fmtPctA, { lowerIsBetter: true })}
+              ${row('Cancellation rate — Prebook', basePrebookCancelRate, basePrebookCancelRate, fmtPctA, { held: true, lowerIsBetter: true })}
             </tbody>
           </table>
         </div>`;
     }
 
-    [$cars, $hpv, $rph].forEach(el => el.addEventListener('input', recompute));
+    [$cars, $hpv, $rph, $canc].forEach(el => el.addEventListener('input', recompute));
     $reset.addEventListener('click', () => {
       $cars.value = '0';
       $hpv.value  = baseHpv.toFixed(2);
       $rph.value  = baseRph.toFixed(3);
+      $canc.value = cancelMax.toFixed(1);
       recompute();
     });
 
