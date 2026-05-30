@@ -1623,10 +1623,32 @@ window.renderDashboard = function renderDashboard(){
       const rph        = parseFloat($rph.value)    || baseRph;
       const targetCancPct = parseFloat($canc.value); // %
       const targetCancRate = isNaN(targetCancPct) ? baseAsapCancelRate : targetCancPct / 100;
-      $carsV.textContent  = (extraCars >= 0 ? '+' : '') + extraCars;
-      $hpvV.textContent   = hpv.toFixed(1);
-      $rphV.textContent   = rph.toFixed(2);
-      $cancV.textContent  = (targetCancRate * 100).toFixed(1) + '%';
+
+      // Helper: format the % delta vs baseline for the slider readout.
+      // Returns a small grey suffix so it doesn't fight the main value.
+      function pctSuffix(cur, base){
+        if (!base) return '';
+        const pct = ((cur - base) / base) * 100;
+        if (Math.abs(pct) < 0.05) return '';
+        const sign = pct >= 0 ? '+' : '';
+        return ` <span class="muted" style="font-size:12px">(${sign}${pct.toFixed(1)}%)</span>`;
+      }
+      // Cancellation rate is itself a %, so its delta is naturally
+      // percentage-points, not relative %.
+      function ppSuffix(curRate, baseRate){
+        const diff = (curRate - baseRate) * 100;
+        if (Math.abs(diff) < 0.05) return '';
+        const sign = diff >= 0 ? '+' : '';
+        return ` <span class="muted" style="font-size:12px">(${sign}${diff.toFixed(1)} pp)</span>`;
+      }
+      const carsPct = baseVehicles ? (extraCars / baseVehicles) * 100 : 0;
+      const carsSfx = extraCars === 0 ? ''
+        : ` <span class="muted" style="font-size:12px">(+${carsPct.toFixed(1)}%)</span>`;
+
+      $carsV.innerHTML  = ((extraCars >= 0 ? '+' : '') + extraCars) + carsSfx;
+      $hpvV.innerHTML   = hpv.toFixed(1)  + pctSuffix(hpv, baseHpv);
+      $rphV.innerHTML   = rph.toFixed(2)  + pctSuffix(rph, baseRph);
+      $cancV.innerHTML  = (targetCancRate * 100).toFixed(1) + '%' + ppSuffix(targetCancRate, baseAsapCancelRate);
 
       const projVehicles = baseVehicles + extraCars;
       const projHours    = projVehicles * hpv;
