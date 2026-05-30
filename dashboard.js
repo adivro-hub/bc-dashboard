@@ -1436,15 +1436,17 @@ window.renderDashboard = function renderDashboard(){
   //   * Extra cars  (additive to current vehicle count)
   //   * Hours / vehicle  (replaces current ratio)
   //   * Rides / hour  (replaces current ratio = jobs / hours)
-  // Projection holds avg_price_per_ride constant from baseline. Recomputes
-  // on every input event.
+  // Projects every metric the Fleet Total card shows. Avg price / ride and
+  // avg earnings / ride are held constant. On-way times and cancellation
+  // rates are held constant (current levers don't model them).
   (async function renderAssumptions(){
     const card     = document.getElementById('assumptionsCard');
     const loading  = document.getElementById('assumptionsLoading');
     const controls = document.getElementById('assumptionsControls');
     const kpisHost = document.getElementById('asmKpis');
+    const tableHost = document.getElementById('asmTableHost');
     const footnote = document.getElementById('asmFootnote');
-    if (!card || !loading || !controls || !kpisHost) return;
+    if (!card || !loading || !controls || !kpisHost || !tableHost) return;
 
     let bundle;
     try {
@@ -1456,7 +1458,6 @@ window.renderDashboard = function renderDashboard(){
       loading.textContent = `Could not load baseline: ${e.message}`;
       return;
     }
-    // Pick the rolled-up total card as baseline.
     const totalName = Object.keys(bundle.fleets || {}).find(
       k => bundle.fleets[k].is_total
     );
@@ -1468,20 +1469,27 @@ window.renderDashboard = function renderDashboard(){
     const baseVehicles = base.unique_vehicles || 0;
     const baseHours    = base.hours || 0;
     const baseRides    = base.done_jobs || base.jobs || 0;
+    const baseAsap     = base.asap_done || 0;
+    const basePrebook  = base.prebook_done || 0;
+    const baseOther    = Math.max(0, baseRides - baseAsap - basePrebook);
     const baseSales    = base.sales || 0;
     const baseEarnings = base.earnings || 0;
     const baseHpv  = baseVehicles ? baseHours / baseVehicles : 0;
     const baseRph  = baseHours    ? baseRides / baseHours    : 0;
     const basePpr  = baseRides    ? baseSales / baseRides    : 0;
     const baseEpr  = baseRides    ? baseEarnings / baseRides : 0;
+    // Mix shares — used to split projected rides into ASAP / Prebook / Other.
+    const shareAsap    = baseRides ? baseAsap    / baseRides : 0;
+    const sharePrebook = baseRides ? basePrebook / baseRides : 0;
+    const shareOther   = baseRides ? baseOther   / baseRides : 0;
 
     if (!baseVehicles || !baseHours || !baseRides){
       loading.textContent = 'Baseline data incomplete — need vehicles, hours and rides for the period.';
       return;
     }
 
-    // Slider config: 50% → 200% of baseline value, step ≈ 0.5% of baseline.
-    const carsMax = Math.max(50, Math.round(baseVehicles));      // up to +100%
+    // Slider bounds: 50% → 200% of baseline.
+    const carsMax = Math.max(50, Math.round(baseVehicles));
     const hpvMin = baseHpv * 0.5, hpvMax = baseHpv * 2.0;
     const rphMin = baseRph * 0.5, rphMax = baseRph * 2.0;
 
@@ -1506,10 +1514,19 @@ window.renderDashboard = function renderDashboard(){
     $bhpv.textContent = baseHpv.toFixed(1);
     $brph.textContent = baseRph.toFixed(2);
 
-    function fmtNum2(v){ return v == null ? '—' : Number(v).toLocaleString('en-US'); }
-    function fmtMon2(v){ return v == null ? '—' : Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    // Formatters — match the Fleets tab style.
+    const fmtNumA = v => v == null ? '—' : Math.round(Number(v)).toLocaleString('en-US');
+    const fmtMonA = v => v == null ? '—' : Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const fmtFloatA = (v, d=2) => v == null ? '—' : Number(v).toFixed(d);
+    const fmtMinA = v => v == null ? '—' : `${Number(v).toFixed(1)} min`;
+    const fmtPctA = v => v == null ? '—' : `${(Number(v)*100).toFixed(1)}%`;
 
-    function tile(label, baseVal, projVal, fmt, unit = ''){
+    function deltaPct(c, p){
+      const diff = (c || 0) - (p || 0);
+      return p ? (diff / p) * 100 : 0;
+    }
+    // Standard tile (single metric, higher-is-better).
+    function tile(label, baseVal, projVal, fmt){
       const diff = projVal - baseVal;
       const pct  = baseVal ? (diff / baseVal) * 100 : 0;
       const flat = Math.abs(pct) < 0.05;
@@ -1518,10 +1535,67 @@ window.renderDashboard = function renderDashboard(){
       const sign  = diff >= 0 ? '+' : '';
       return `<div class="card kpi">
         <div class="label">${label}</div>
-        <div class="value num">${fmt(projVal)}${unit}</div>
-        <div class="prev num">baseline ${fmt(baseVal)}${unit}</div>
+        <div class="value num">${fmt(projVal)}</div>
+        <div class="prev num">baseline ${fmt(baseVal)}</div>
         <span class="delta ${cls}">${arrow} ${sign}${pct.toFixed(1)}% (${sign}${fmt(diff)})</span>
       </div>`;
+    }
+    // Inline delta pill for split tiles.
+    function inlineDelta(cv, pv, lowerIsBetter = false){
+      const diff = (cv || 0) - (pv || 0);
+      const pct  = pv ? (diff / pv) * 100 : 0;
+      const flat = Math.abs(pct) < 0.05;
+      const goodDir = lowerIsBetter ? diff <= 0 : diff >= 0;
+      const cls  = flat ? 'flat' : (goodDir ? 'up' : 'down');
+      const arrow = flat ? '■' : (diff >= 0 ? '▲' : '▼');
+      return `<span class="delta ${cls}" style="margin-top:0;padding:1px 6px;font-size:11px">${arrow} ${(pct>=0?'+':'')}${pct.toFixed(1)}%</span>`;
+    }
+    function splitTile(label, cAsap, pAsap, cPre, pPre, fmt, lowerIsBetter = false){
+      return `<div class="card kpi">
+        <div class="label">${label}</div>
+        <div style="margin-top:8px;line-height:1.7">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span><span class="muted" style="font-size:12px">ASAP</span>
+              <strong class="num" style="font-size:18px">${fmt(cAsap ?? 0)}</strong>
+              <span class="muted" style="font-size:11px">· base ${fmt(pAsap ?? 0)}</span></span>
+            ${inlineDelta(cAsap, pAsap, lowerIsBetter)}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px">
+            <span><span class="muted" style="font-size:12px">Prebook</span>
+              <strong class="num" style="font-size:18px">${fmt(cPre ?? 0)}</strong>
+              <span class="muted" style="font-size:11px">· base ${fmt(pPre ?? 0)}</span></span>
+            ${inlineDelta(cPre, pPre, lowerIsBetter)}
+          </div>
+        </div>
+      </div>`;
+    }
+    // Table row — projected vs baseline + delta cell.
+    function row(label, projVal, baseVal, fmt, opts = {}){
+      const lowerIsBetter = !!opts.lowerIsBetter;
+      const heldConstant  = !!opts.held;
+      const diff = (projVal || 0) - (baseVal || 0);
+      const pct  = baseVal ? (diff / baseVal) * 100 : 0;
+      let deltaHtml;
+      if (heldConstant){
+        deltaHtml = `<td class="num muted" title="Held constant — current levers don't model this">held</td>`;
+      } else if (projVal == null && baseVal == null){
+        deltaHtml = '<td class="num muted">—</td>';
+      } else {
+        const goodDir = lowerIsBetter ? diff <= 0 : diff >= 0;
+        const cls = Math.abs(diff) < 0.005 ? 'muted' : (goodDir ? 'pos' : 'neg');
+        const arrow = diff >= 0 ? '▲' : '▼';
+        deltaHtml = `<td class="num ${cls}">${arrow} ${(diff>=0?'+':'')}${pct.toFixed(1)}%</td>`;
+      }
+      const sub = opts.sub ? `<span class="muted" title="${opts.sub}">(?)</span>` : '';
+      const indent = opts.indent ? 'style="padding-left:24px"' : '';
+      const muted = opts.indent ? 'class="muted"' : '';
+      return `<tr><td ${indent} ${muted}>${label} ${sub}</td>
+        <td class="num"><strong>${fmt(projVal)}</strong></td>
+        <td class="num muted">${fmt(baseVal)}</td>
+        ${deltaHtml}</tr>`;
+    }
+    function groupHead(label){
+      return `<tr class="group-head"><td colspan="4">${label}</td></tr>`;
     }
 
     function recompute(){
@@ -1535,15 +1609,68 @@ window.renderDashboard = function renderDashboard(){
       const projVehicles = baseVehicles + extraCars;
       const projHours    = projVehicles * hpv;
       const projRides    = projHours * rph;
+      const projAsap     = projRides * shareAsap;
+      const projPrebook  = projRides * sharePrebook;
+      const projOther    = projRides * shareOther;
       const projSales    = projRides * basePpr;
       const projEarnings = projRides * baseEpr;
+      const projHpr      = projRides ? projHours / projRides : null;
+      const baseHpr      = baseRides ? baseHours / baseRides : null;
+      // Held-constant fields (response times, cancellation rates)
+      const baseRtAsap   = base.response_time?.asap?.avg_min    ?? null;
+      const baseRtPre    = base.response_time?.prebook?.avg_min ?? null;
+      const baseCancAsap = base.cancellation_rate_asap          ?? 0;
+      const baseCancPre  = base.cancellation_rate_prebook       ?? 0;
 
+      // ---- KPI tiles row (mirrors Fleet Total card) ----
       kpisHost.innerHTML =
-        tile('Vehicles',        baseVehicles, projVehicles, fmtNum2) +
-        tile('Online hours',    baseHours,    projHours,    v => Math.round(v).toLocaleString('en-US')) +
-        tile('Service rides',   baseRides,    projRides,    v => Math.round(v).toLocaleString('en-US')) +
-        tile('Sales (RON)',     baseSales,    projSales,    fmtMon2) +
-        tile('Earnings (RON)',  baseEarnings, projEarnings, fmtMon2);
+        tile('Online hours', baseHours, projHours, fmtNumA) +
+        splitTile('Service rides',
+                  projAsap, baseAsap, projPrebook, basePrebook, fmtNumA) +
+        splitTile('Cancellation rate',
+                  baseCancAsap, baseCancAsap, baseCancPre, baseCancPre, fmtPctA, true) +
+        tile('Sales (RON)', baseSales, projSales, fmtMonA);
+
+      // ---- Full breakdown table ----
+      const otherRow = (baseOther > 0 || projOther > 0.5)
+        ? row('— Other', projOther, baseOther, fmtNumA, { indent: true })
+        : '';
+      tableHost.innerHTML = `
+        <div class="card">
+          <div class="row-head">
+            <div><strong>${totalName}</strong>
+              <span class="pill">Projected vs baseline</span>
+              <span class="pill" style="background:transparent">${cur.period_from} → ${cur.period_to}</span>
+            </div>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Metric</th><th>Projected</th><th>Baseline</th><th>Δ %</th>
+            </tr></thead>
+            <tbody>
+              ${groupHead('Capacity')}
+              ${row('Vehicles', projVehicles, baseVehicles, fmtNumA)}
+              ${row('Online hours', projHours, baseHours, fmtNumA)}
+              ${row('Hours / vehicle', hpv, baseHpv, v => fmtFloatA(v, 1))}
+              ${row('Hours / ride', projHpr, baseHpr, v => fmtFloatA(v, 2), { lowerIsBetter: true })}
+
+              ${groupHead('Volume & Revenue')}
+              ${row('Service rides', projRides, baseRides, fmtNumA)}
+              ${row('— ASAP done', projAsap, baseAsap, fmtNumA, { indent: true })}
+              ${row('— Prebook done', projPrebook, basePrebook, fmtNumA, { indent: true })}
+              ${otherRow}
+              ${row('Sales (RON)', projSales, baseSales, fmtMonA)}
+              ${row('Earnings (RON)', projEarnings, baseEarnings, fmtMonA)}
+              ${row('Avg price / ride (RON)', basePpr, basePpr, fmtMonA, { held: true })}
+
+              ${groupHead('Service quality')}
+              ${row('Avg on-way time — ASAP', baseRtAsap, baseRtAsap, fmtMinA, { held: true, lowerIsBetter: true })}
+              ${row('Avg on-way time — Prebook', baseRtPre, baseRtPre, fmtMinA, { held: true, lowerIsBetter: true })}
+              ${row('Cancellation rate — ASAP', baseCancAsap, baseCancAsap, fmtPctA, { held: true, lowerIsBetter: true })}
+              ${row('Cancellation rate — Prebook', baseCancPre, baseCancPre, fmtPctA, { held: true, lowerIsBetter: true })}
+            </tbody>
+          </table>
+        </div>`;
     }
 
     [$cars, $hpv, $rph].forEach(el => el.addEventListener('input', recompute));
