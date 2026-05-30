@@ -1250,12 +1250,12 @@ window.renderDashboard = function renderDashboard(){
     for (const name of fleets){
       const c = curBundle.fleets[name]  || {};
       const p = prevBundle.fleets[name] || {};
-      // Hours / ride uses the same DONE-rides denominator as Service rides
-      // so the math stays consistent on the card.
+      // Rides / hour uses the same DONE-rides numerator as Service rides
+      // so the math stays consistent on the card. Higher = better.
       const cRides = c.done_jobs ?? c.jobs ?? 0;
       const pRides = p.done_jobs ?? p.jobs ?? 0;
-      const cHpr = c.hours_per_ride ?? rideRatio(c.hours, cRides);
-      const pHpr = p.hours_per_ride ?? rideRatio(p.hours, pRides);
+      const cRph = c.hours > 0 ? cRides / c.hours : null;
+      const pRph = p.hours > 0 ? pRides / p.hours : null;
       const diag = diagnoseFleet(c, p);
       // Residual DONE rides with urgency outside ASAP/PREBOOK (NULL or other).
       // Usually 0; surface a sub-row only when it's non-zero so the parent
@@ -1369,10 +1369,10 @@ window.renderDashboard = function renderDashboard(){
                     c.unique_vehicles ? c.hours/c.unique_vehicles : null,
                     p.unique_vehicles ? p.hours/p.unique_vehicles : null,
                     v => v.toFixed(2))}</tr>
-              <tr><td>Hours / ride</td>
-                  <td class="num">${cHpr == null ? '—' : cHpr.toFixed(2)}</td>
-                  <td class="num muted">${pHpr == null ? '—' : pHpr.toFixed(2)}</td>
-                  ${deltaCell(cHpr, pHpr, v => v.toFixed(2))}</tr>
+              <tr><td>Rides / hour</td>
+                  <td class="num">${cRph == null ? '—' : cRph.toFixed(2)}</td>
+                  <td class="num muted">${pRph == null ? '—' : pRph.toFixed(2)}</td>
+                  ${deltaCell(cRph, pRph, v => v.toFixed(2))}</tr>
 
               <tr class="group-head"><td colspan="4">Volume &amp; Revenue</td></tr>
               <tr><td>Service rides
@@ -1699,8 +1699,9 @@ window.renderDashboard = function renderDashboard(){
       const projRides    = projAsap + projPrebook + projOther;
       const projSales    = projRides * basePpr;
       const projEarnings = projRides * baseEpr;
-      const projHpr      = projRides ? projHours / projRides : null;
-      const baseHpr      = baseRides ? baseHours / baseRides : null;
+      // Rides / hour (higher = better). Same source on numerator + denominator.
+      const projRph      = projHours > 0 ? projRides / projHours : null;
+      // baseRph already computed at the top of renderAssumptions().
       // Response times are still held (no slider models them).
       const baseRtAsap   = base.response_time?.asap?.avg_min    ?? null;
       const baseRtPre    = base.response_time?.prebook?.avg_min ?? null;
@@ -1739,7 +1740,7 @@ window.renderDashboard = function renderDashboard(){
               ${row('Hours / vehicle', blendedHpv, baseHpv, v => fmtFloatA(v, 1), {
                       sub: `Blended: baseline cars keep ${baseHpv.toFixed(1)} h, new cars at ${newCarHoursPerPeriod.toFixed(0)} h (${newCarHpd.toFixed(1)} h/day × ${periodDays} days)`
                     })}
-              ${row('Hours / ride', projHpr, baseHpr, v => fmtFloatA(v, 2), { lowerIsBetter: true })}
+              ${row('Rides / hour', projRph, baseRph, v => fmtFloatA(v, 2))}
 
               ${groupHead('Volume & Revenue')}
               ${row('Service rides', projRides, baseRides, fmtNumA)}
