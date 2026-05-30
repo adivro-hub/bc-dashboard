@@ -1469,6 +1469,11 @@ window.renderDashboard = function renderDashboard(){
       return;
     }
     const base = bundle.fleets[totalName];
+    // New cars are assumed to work 8 hours per day for the whole period.
+    // (Configurable later if needed — for now this is the user's spec.)
+    const NEW_CAR_HOURS_PER_DAY = 8;
+    const periodDays = curDays;
+    const newCarHoursPerPeriod = NEW_CAR_HOURS_PER_DAY * periodDays;
     const baseVehicles = base.unique_vehicles || 0;
     const baseHours    = base.hours || 0;
     const baseRides    = base.done_jobs || base.jobs || 0;
@@ -1525,6 +1530,9 @@ window.renderDashboard = function renderDashboard(){
     $bhpv.textContent = baseHpv.toFixed(1);
     $brph.textContent = baseRph.toFixed(2);
     $bcanc.textContent = (baseAsapCancelRate * 100).toFixed(1) + '%';
+    const $newCarHours = document.getElementById('asmNewCarHours');
+    if ($newCarHours) $newCarHours.textContent =
+      `${NEW_CAR_HOURS_PER_DAY}×${periodDays} = ${newCarHoursPerPeriod} h each`;
 
     // Formatters — match the Fleets tab style.
     const fmtNumA = v => v == null ? '—' : Math.round(Number(v)).toLocaleString('en-US');
@@ -1651,7 +1659,14 @@ window.renderDashboard = function renderDashboard(){
       $cancV.innerHTML  = (targetCancRate * 100).toFixed(1) + '%' + ppSuffix(targetCancRate, baseAsapCancelRate);
 
       const projVehicles = baseVehicles + extraCars;
-      const projHours    = projVehicles * hpv;
+      // Hours are split by cohort:
+      //   * Baseline cars use the hpv slider (their utilisation for the period).
+      //   * New cars are assumed at 8 h/day for the period.
+      // The 'Hours/vehicle' table row shows the BLENDED average across both.
+      const baselineCarsHours = baseVehicles * hpv;
+      const newCarsHours      = extraCars   * newCarHoursPerPeriod;
+      const projHours         = baselineCarsHours + newCarsHours;
+      const blendedHpv        = projVehicles ? projHours / projVehicles : 0;
       // Total ride capacity comes from the three capacity sliders.
       // Extra rides (vs baseline) get distributed by urgency as follows:
       //
@@ -1722,7 +1737,9 @@ window.renderDashboard = function renderDashboard(){
               ${groupHead('Capacity')}
               ${row('Vehicles', projVehicles, baseVehicles, fmtNumA)}
               ${row('Online hours', projHours, baseHours, fmtNumA)}
-              ${row('Hours / vehicle', hpv, baseHpv, v => fmtFloatA(v, 1))}
+              ${row('Hours / vehicle', blendedHpv, baseHpv, v => fmtFloatA(v, 1), {
+                      sub: `Blended across baseline cars (${hpv.toFixed(1)} h slider) and new cars (${newCarHoursPerPeriod} h fixed = ${NEW_CAR_HOURS_PER_DAY} h/day × ${periodDays} days)`
+                    })}
               ${row('Hours / ride', projHpr, baseHpr, v => fmtFloatA(v, 2), { lowerIsBetter: true })}
 
               ${groupHead('Volume & Revenue')}

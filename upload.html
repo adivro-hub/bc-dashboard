@@ -530,12 +530,14 @@
           </div>
           <div>
             <label for="asmHpv" style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
-              <strong>Hours / vehicle</strong>
+              <strong>Hours / vehicle <span class="muted" style="font-weight:400">(baseline cars)</span></strong>
               <span class="num" id="asmHpvVal" style="font-size:18px;color:var(--accent)">—</span>
             </label>
             <input type="range" id="asmHpv" min="0" max="100" step="0.1" value="50" style="width:100%;margin-top:8px">
             <div class="muted" style="font-size:11px;margin-top:4px">
-              Baseline: <span id="asmBaseHpv">—</span> hours / vehicle in this period
+              Baseline: <span id="asmBaseHpv">—</span> h/vehicle in this period.
+              New cars are assumed at <strong>8 h/day</strong>
+              (<span id="asmNewCarHours">—</span> for the period).
             </div>
           </div>
           <div>
@@ -573,8 +575,9 @@
       from <code>job_analogue</code> with service ∈ {BlackCab, BlackCab 7, Select,
       Elite, ChildSeat, KidsCab, iDrive Your Car, MailCab, Shuttle Bus}.
       <br><br>
-      <strong>Allocation logic.</strong> Total capacity =
-      <em>(baseline cars + extra) × hours/vehicle × rides/hour</em>. Baseline
+      <strong>Allocation logic.</strong> Total hours =
+      <em>(baseline cars × hours/vehicle slider) + (new cars × 8 h/day × period days)</em>.
+      Total capacity = <em>total hours × rides/hour</em>. Baseline
       rides are preserved as-is; only the <em>extra</em> rides get split:
       <ul style="margin:6px 0 0 18px;padding:0">
         <li>Default (no cancel change): extra rides split by baseline mix —
