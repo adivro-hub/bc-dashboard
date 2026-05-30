@@ -112,6 +112,7 @@ window.renderDashboard = function renderDashboard(){
   ];
   const grid = document.getElementById('kpiGrid');
   function addKpi(label, c, p, fmt){
+    if (!grid) return;
     const delta = p? ((c-p)/p)*100 : 0;
     const cls = Math.abs(delta) < 0.05 ? 'flat' : (delta>=0?'up':'down');
     const arrow = cls==='up'?'▲':cls==='down'?'▼':'■';
@@ -123,12 +124,14 @@ window.renderDashboard = function renderDashboard(){
         <span class="delta ${cls}">${arrow} ${fmtPct(delta)}</span>
       </div>`);
   }
-  kpiDefs.forEach(d=>{
-    addKpi(d.label, cur.kpis[d.key], prev.kpis[d.key], d.fmt);
-  });
-  if (window.__TOPCLIENTS__ && window.__TOPCLIENTS__.retail){
-    const rc = window.__TOPCLIENTS__.retail.context;
-    addKpi('Unique retail clients', rc.cur_clients, rc.prev_clients, fmtInt);
+  if (grid){
+    kpiDefs.forEach(d=>{
+      addKpi(d.label, cur.kpis[d.key], prev.kpis[d.key], d.fmt);
+    });
+    if (window.__TOPCLIENTS__ && window.__TOPCLIENTS__.retail){
+      const rc = window.__TOPCLIENTS__.retail.context;
+      addKpi('Unique retail clients', rc.cur_clients, rc.prev_clients, fmtInt);
+    }
   }
 
   // ---------- HELPERS ----------
@@ -147,8 +150,11 @@ window.renderDashboard = function renderDashboard(){
   }
 
   // ---------- USER REGISTRATIONS ----------
+  // Overview tab no longer carries the registrations card by default —
+  // the fleet view replaced it. Guarded so the chunk is a no-op when the
+  // DOM elements aren't present (e.g. new Overview layout).
   const R = window.__REG__;
-  if (R){
+  if (R && document.getElementById('regKpis')){
     const sCur = R.summary.current, sPrev = R.summary.previous;
     const dTot = sCur.total - sPrev.total;
     const pTot = sPrev.total ? (dTot / sPrev.total) * 100 : 0;
@@ -1766,7 +1772,7 @@ window.renderDashboard = function renderDashboard(){
             <thead><tr>
               <th>Metric</th>
               <th>Projected</th>
-              <th title="Gain over baseline if fleet overlap indicator were 100% (no driver churn) — the theoretical ceiling">Max gain (no overlap)</th>
+              <th title="Gain over baseline if fleet overlap indicator were 100% — the theoretical ceiling, treating every added car as a brand-new addition to the fleet (no replacement of baseline drivers)">New Fleet</th>
               <th>Baseline</th>
               <th>Δ %</th>
               <th>Δ abs</th>
@@ -1774,7 +1780,7 @@ window.renderDashboard = function renderDashboard(){
             <tbody>
               ${groupHead('Capacity')}
               ${row('Vehicles', projVehicles, max.projVehicles, baseVehicles, fmtNumA, {
-                      sub: `Net effective = baseline + (extra × overlap indicator). Projected: ${extraCars} × ${(newCarEff*100).toFixed(0)}% = ${netExtraCars.toFixed(1)}. Max (no overlap): all ${extraCars} land net`
+                      sub: `Net effective = baseline + (extra × overlap indicator). Projected: ${extraCars} × ${(newCarEff*100).toFixed(0)}% = ${netExtraCars.toFixed(1)}. New Fleet (no overlap): all ${extraCars} land net`
                     })}
               ${row('Online hours', projHours, max.projHours, baseHours, fmtNumA)}
               ${row('Hours / vehicle', blendedHpv, max.blendedHpv, baseHpv, v => fmtFloatA(v, 1), {

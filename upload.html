@@ -205,30 +205,24 @@
     <button data-tab="ltv">Client LTV</button>
     <button data-tab="hours">Hours &amp; Telemetry</button>
     <button data-tab="ops">Operational KPIs</button>
-    <button data-tab="fleets">Fleets</button>
     <button data-tab="assumptions">Assumptions</button>
   </div>
 
   <div class="view active" data-view="overview">
-
-  <h2>Headline KPIs</h2>
-  <div class="grid kpis" id="kpiGrid"></div>
-
-  <h2>User registrations</h2>
-  <div class="card" id="regCard">
-    <div class="grid panels">
-      <div>
-        <div class="grid kpis" style="grid-template-columns:repeat(2,1fr)" id="regKpis"></div>
-        <div class="summary-strip" id="regStatus" style="margin-top:10px"></div>
-        <p class="sub" id="regNote" style="margin-top:10px"></p>
-      </div>
-      <div>
-        <div class="row-head"><div><strong>Daily registrations</strong></div></div>
-        <div class="chart-wrap"><canvas id="regChart"></canvas></div>
-      </div>
-    </div>
-  </div>
-
+    <h2>Bucharest fleets — BlackCab &amp; Select</h2>
+    <p class="sub" style="margin-top:-8px;margin-bottom:18px">
+      Per-fleet operational snapshot for the two main Bucharest fleets.
+      <strong>Hours, rides, sales and earnings</strong> come from the
+      operator's own per-fleet daily roll-ups (authoritative).
+      <strong>Unique vehicles</strong> is a proxy — <code>job_analogue</code> has no
+      fleet column, so it counts distinct vehicle plates by the fleet's
+      service whitelist (BlackCab Fleet ← service in {BlackCab, BlackCab 7};
+      Select Fleet ← service = Select).
+    </p>
+    <div class="grid panels" id="fleetCards"></div>
+    <p class="sub" id="fleetEmpty" style="display:none;margin-top:18px">
+      No data for either fleet in the selected period.
+    </p>
   </div><!-- /view-overview -->
 
   <div class="view" data-view="income">
@@ -489,22 +483,6 @@
     </p>
   </div><!-- /view-ops -->
 
-  <div class="view" data-view="fleets">
-    <h2>Bucharest fleets — BlackCab &amp; Select</h2>
-    <p class="sub" style="margin-top:-8px;margin-bottom:18px">
-      Per-fleet operational snapshot for the two main Bucharest fleets.
-      <strong>Hours, rides, sales and earnings</strong> come from the
-      operator's own per-fleet daily roll-ups (authoritative).
-      <strong>Unique vehicles</strong> is a proxy — <code>job_analogue</code> has no
-      fleet column, so it counts distinct vehicle plates by the fleet's
-      service whitelist (BlackCab Fleet ← service in {BlackCab, BlackCab 7};
-      Select Fleet ← service = Select).
-    </p>
-    <div class="grid panels" id="fleetCards"></div>
-    <p class="sub" id="fleetEmpty" style="display:none;margin-top:18px">
-      No data for either fleet in the selected period.
-    </p>
-  </div><!-- /view-fleets -->
 
   <div class="view" data-view="assumptions">
     <h2>Capacity simulation — BlackCab + Select</h2>
@@ -612,11 +590,12 @@
       Without extra capacity (all 3 capacity sliders at baseline), lowering
       the cancel rate has no effect — the rescue needs room to happen.
       <br><br>
-      The <strong>Max gain (no overlap)</strong> column shows what the gain
-      over baseline would be at 100% fleet overlap indicator — i.e. the
-      theoretical ceiling if zero baseline drivers leave when newcomers
-      join. Compare it to <em>Δ abs</em> (the realistic gain): the
-      difference between them is the cost of overlap for this scenario.
+      The <strong>New Fleet</strong> column shows what the gain over baseline
+      would be at 100% fleet overlap indicator — i.e. the theoretical
+      ceiling, treating every added car as a brand-new addition with zero
+      replacement of baseline drivers. Compare it to <em>Δ abs</em> (the
+      realistic gain): the difference between them is the cost of overlap
+      for this scenario.
       <br><br>
       <strong>On-way times</strong> and <strong>Prebook cancellation rate</strong>
       are held constant — the current levers don't model them.
