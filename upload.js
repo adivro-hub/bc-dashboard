@@ -789,10 +789,31 @@
   // Anonymize toggle: when unchecked (default), the dashboard renders
   // corporate accounts as just their account number. Persisted in
   // localStorage so the choice survives reloads.
+  //
+  // Viewers (role: 'viewer') cannot see client names regardless — the
+  // toggle's label/wrapper is hidden, BC_showNames is pinned to false,
+  // and the backend (/api/top-clients, /api/account-names) strips
+  // names for them too. So flipping the flag in devtools wouldn't
+  // surface anything either.
   const showNamesCb = document.getElementById('showNamesToggle');
   if (showNamesCb){
-    showNamesCb.checked = (localStorage.getItem('bc-show-names') === 'true');
-    window.BC_showNames = showNamesCb.checked;
+    // Resolve role async; until it resolves, default to anonymised.
+    window.BC_showNames = false;
+    (async () => {
+      let role = null;
+      try { role = await window.BCStore?.getRole?.(); } catch { /* ignore */ }
+      if (role === 'viewer' || !role){
+        // Hide the whole <label> so the chrome doesn't even hint at it.
+        const wrap = showNamesCb.closest('.header-toggle');
+        if (wrap) wrap.style.display = 'none';
+        showNamesCb.checked = false;
+        window.BC_showNames = false;
+        return;
+      }
+      // Uploader (or any non-viewer role): restore the persisted choice.
+      showNamesCb.checked = (localStorage.getItem('bc-show-names') === 'true');
+      window.BC_showNames = showNamesCb.checked;
+    })();
     showNamesCb.addEventListener('change', () => {
       localStorage.setItem('bc-show-names', String(showNamesCb.checked));
       window.BC_showNames = showNamesCb.checked;

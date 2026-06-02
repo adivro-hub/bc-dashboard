@@ -65,11 +65,25 @@ export default async function handler(req, res) {
       [from, to]
     );
 
+    // Viewer redaction: corporate names are PII-adjacent — only
+    // uploaders see them. Retail (account_number = 110000) is a
+    // category label ("Public Account"), not a real customer, so we
+    // leave its name intact. Bearer-token API access (no session) is
+    // unaffected; it's only used by cron / smoke tests.
+    const isViewer = req.session?.role === 'viewer';
+    const safeRows = isViewer
+      ? rows.map(r => (
+          r.account_number === PUBLIC_ACCOUNT_NO
+            ? r
+            : { ...r, account_name: null }
+        ))
+      : rows;
+
     ok(res, {
       from, to, segment, limit,
       total_revenue: totalsRow.total_revenue,
-      rows,
-    }, { cache: 'public, max-age=60, must-revalidate' });
+      rows: safeRows,
+    }, { cache: 'private, max-age=60, must-revalidate' });
   } catch (e) {
     console.error(e);
     bad(res, 500, e.message || 'query failed');

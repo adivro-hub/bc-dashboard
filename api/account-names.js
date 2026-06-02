@@ -23,12 +23,21 @@ export default async function handler(req, res) {
         WHERE account_number IS NOT NULL
         GROUP BY account_number`
     );
+    // Viewer redaction: corporate names hidden. We keep the retail
+    // bucket ("110000" → "Public Account") since that's a category
+    // label, not a customer identity; some dashboard sections render
+    // it explicitly. Bearer-token callers (no session) get the full
+    // map — only browser cookie sessions are checked.
+    const isViewer = req.session?.role === 'viewer';
     const account_names = {};
     for (const r of rows) {
-      if (r.name) account_names[r.account_no] = r.name;
+      if (!r.name) continue;
+      if (isViewer && r.account_no !== '110000') continue;
+      account_names[r.account_no] = r.name;
     }
-    ok(res, { count: rows.length, account_names },
-       { cache: 'public, max-age=600, s-maxage=600, must-revalidate' });
+    // Response now varies by role → must NOT live in a shared cache.
+    ok(res, { count: Object.keys(account_names).length, account_names },
+       { cache: 'private, max-age=600, must-revalidate' });
   } catch (e) {
     console.error(e);
     bad(res, 500, e.message || 'account-names query failed');
